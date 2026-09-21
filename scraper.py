@@ -231,6 +231,108 @@ def bing_rss(s: requests.Session, query: str) -> list[tuple[str, str]]:
             out.append((title, link))
     return out
 
+
+ML_NINTENDO_STORE = "https://www.mercadolibre.cl/tienda/nintendo"
+
+def ml_target_title(text: str) -> bool:
+    low = " ".join(text.lower().split())
+    has_core = all(token in low for token in ("switch", "zelda", "40"))
+    has_console = "consola" in low or "system" in low
+    has_anniversary = any(token in low for token in (
+        "40th", "40.º", "40º", "40°", "40 aniversario", "40th anniversary",
+        "edición 40", "edicion 40",
+    ))
+    return has_core and has_console and has_anniversary
+
+def ml_is_official_nintendo(corpus: str) -> bool:
+    low = " ".join(corpus.lower().split())
+    return (
+        ("tienda oficial" in low and "nintendo" in low)
+        or "visita la tienda oficial de nintendo" in low
+    )
+
+def discover_mercadolibre_official(
+    s: requests.Session,
+    known_urls: set[str],
+) -> list[Product]:
+    """Busca exclusivamente la consola Zelda 40th en la Tienda Oficial Nintendo de Mercado Libre.
+
+    Se intenta primero leer la portada de la tienda oficial para detectar una publicación nueva
+    de inmediato. Como respaldo se usa Bing RSS, porque Mercado Libre puede interponer anti-bot
+    a requests directos aunque la ficha exista públicamente.
+    """
+    found: list[Product] = []
+    seen = set(known_urls)
+
+    # 1) Portada de la Tienda Oficial Nintendo.
+    try:
+        r = s.get(ML_NINTENDO_STORE, timeout=TIMEOUT, allow_redirects=True)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, "html.parser")
+            page_text = soup.get_text(" ", strip=True)
+            page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
+            challenge = " ".join((page_title + " " + page_text[:5000]).lower().split())
+            if not any(marker in challenge for marker in (
+                "just a moment", "un momento", "checking your browser",
+                "verify you are human", "cloudflare", "enable javascript and cookies",
+            )):
+                for a in soup.find_all("a", href=True):
+                    parts = [
+                        a.get_text(" ", strip=True),
+                        str(a.get("title") or ""),
+                    ]
+                    img = a.find("img")
+                    if img:
+                        parts.append(str(img.get("alt") or ""))
+                    candidate_title = " ".join(x for x in parts if x).strip()
+                    if not ml_target_title(candidate_title):
+                        continue
+                    url = urllib.parse.urljoin(ML_NINTENDO_STORE, a["href"]).split("#", 1)[0]
+                    host = urllib.parse.urlparse(url).netloc.lower()
+                    if "mercadolibre.cl" not in host or url in seen:
+                        continue
+                    seen.add(url)
+                    current = inspect(s, "Mercado Libre · Nintendo Oficial", url)
+                    if current.status not in ("error", "unknown"):
+                        found.append(current)
+    except requests.RequestException:
+        pass
+
+    # 2) Respaldo por índice web. Exige que la ficha declare Tienda Oficial Nintendo.
+    queries = [
+        'site:mercadolibre.cl "Nintendo Switch 2" "Zelda" "40th" "Tienda oficial"',
+        'site:mercadolibre.cl "Consola Nintendo Switch 2" "Zelda" "40" "aniversario"',
+    ]
+    for query in queries:
+        for result_title, url in bing_rss(s, query):
+            url = url.split("#", 1)[0]
+            if url in seen:
+                continue
+            host = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
+            if host != "mercadolibre.cl":
+                continue
+            try:
+                r = s.get(url, timeout=TIMEOUT, allow_redirects=True)
+                if r.status_code != 200:
+                    continue
+                soup = BeautifulSoup(r.text, "html.parser")
+                body = soup.get_text(" ", strip=True)[:120_000]
+                title = soup.title.get_text(" ", strip=True) if soup.title else result_title
+                corpus = f"{title} {body}"
+                if not ml_target_title(corpus):
+                    continue
+                if not ml_is_official_nintendo(corpus):
+                    continue
+                seen.add(url)
+                current = inspect(s, "Mercado Libre · Nintendo Oficial", url)
+                if current.status not in ("error", "unknown"):
+                    found.append(current)
+            except requests.RequestException:
+                continue
+            time.sleep(0.25)
+
+    return found
+
 def discover(s: requests.Session, known_urls: set[str]) -> list[Product]:
     queries = [
         '"Nintendo Switch 2" "Zelda" "40th" Chile',
@@ -247,6 +349,9 @@ def discover(s: requests.Session, known_urls: set[str]) -> list[Product]:
             seen.add(url)
             host = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
             if not host.endswith(".cl"):
+                continue
+            if host == "mercadolibre.cl":
+                # Mercado Libre se maneja aparte para exigir Tienda Oficial Nintendo.
                 continue
             try:
                 r = s.get(url, timeout=TIMEOUT, allow_redirects=True)
