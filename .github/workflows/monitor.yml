@@ -1,6 +1,6 @@
 name: Revisar stock Switch 2 Zelda 40th
 
-run-name: ${{ github.event_name == 'schedule' && '🤖 AUTO · revisión cada 5 min' || github.event_name == 'workflow_dispatch' && '🧪 MANUAL · revisión solicitada' || '🔧 CÓDIGO · validación del monitor' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && '🧪 MANUAL · revisión solicitada' || '🔧 CÓDIGO · validación del monitor' }}
 
 on:
   push:
@@ -11,9 +11,6 @@ on:
       - 'scraper.py'
       - 'stores.json'
       - 'requirements.txt'
-  schedule:
-    # Cron simple y estándar: GitHub intentará ejecutar el workflow cada 5 minutos.
-    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       discover:
@@ -66,12 +63,6 @@ jobs:
             DISCOVER='true'
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             DISCOVER='true'
-          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # En cron, ampliar búsqueda aproximadamente cada 15 min:
-            # una de cada tres ejecuciones programadas.
-            if (( GITHUB_RUN_NUMBER % 3 == 0 )); then
-              DISCOVER='true'
-            fi
           fi
 
           echo "discover=$DISCOVER" >> "$GITHUB_OUTPUT"
