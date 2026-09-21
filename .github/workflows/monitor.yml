@@ -5,8 +5,12 @@ run-name: ${{ github.event_name == 'schedule' && '🤖 AUTO · revisión cada 5 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'state/**'
+    paths:
+      - '.github/workflows/monitor.yml'
+      - 'monitor.py'
+      - 'scraper.py'
+      - 'stores.json'
+      - 'requirements.txt'
   schedule:
     # Cron simple y estándar: GitHub intentará ejecutar el workflow cada 5 minutos.
     - cron: '*/5 * * * *'
