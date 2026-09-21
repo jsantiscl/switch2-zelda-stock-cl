@@ -172,8 +172,18 @@ def inspect(s: requests.Session, name: str, url: str) -> Product:
             return Product(name, url, r.status_code, None, "error", None)
         soup = BeautifulSoup(r.text, "html.parser")
         text = soup.get_text(" ", strip=True)
+        page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
+        challenge = " ".join((page_title + " " + text[:5000]).lower().split())
+        challenge_markers = (
+            "just a moment", "un momento", "checking your browser",
+            "verify you are human", "verifique que es humano", "cloudflare",
+            "enable javascript and cookies", "attention required",
+        )
+        if any(marker in challenge for marker in challenge_markers):
+            return Product(name, url, r.status_code, page_title or None, "error", None)
+
         price_json, availability, product_name = jsonld_product(soup)
-        title = product_name or (soup.title.get_text(" ", strip=True) if soup.title else None)
+        title = product_name or (page_title or None)
 
         # TodoJuegos declara explícitamente "Precio x Confirmar"; no inferimos un precio
         # desde productos destacados o relacionados del resto de la página.
