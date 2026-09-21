@@ -22,8 +22,9 @@ UA = (
 )
 
 NEGATIVE = (
-    "agotado", "sin existencias", "sin stock", "sold out", "out of stock",
-    "producto no disponible", "temporalmente agotado",
+    "agotado", "sin existencias", "sin stock", "fuera de stock",
+    "sold out", "out of stock", "producto no disponible", "temporalmente agotado",
+    "actualmente no se encuentra disponible", "no tendrá preventa", "no tendra preventa",
 )
 POSITIVE = (
     "agregar al carrito", "añadir al carrito", "anadir al carrito",
@@ -76,7 +77,9 @@ def money(value: Any) -> int | None:
     if not digits:
         return None
     n = int(digits)
-    return n if 100_000 <= n <= 2_000_000 else None
+    # Esta edición de consola se mueve muy por encima de accesorios/juegos.
+    # El piso evita tomar cuotas y productos relacionados como si fueran el precio de la consola.
+    return n if 500_000 <= n <= 2_000_000 else None
 
 def walk(value: Any):
     if isinstance(value, dict):
@@ -88,8 +91,13 @@ def walk(value: Any):
             yield from walk(v)
 
 def jsonld_product(soup: BeautifulSoup) -> tuple[int | None, str | None, str | None]:
-    price = availability = product_name = None
-    for tag in soup.find_all("script", attrs={"type": re.compile(r"ld\+json", re.I)}):
+    """Toma solo el Product JSON-LD que realmente corresponde a la consola Zelda 40th.
+
+    Varias tiendas incluyen carruseles completos como Product JSON-LD; recorrerlos sin filtrar
+    hacía que termináramos leyendo el precio de un juego o accesorio relacionado.
+    """
+    candidates: list[tuple[int, dict[str, Any]]] = []
+    for tag in soup.find_all("script", attrs={"type": re.compile(r"ld\\+json", re.I)}):
         raw = tag.string or tag.get_text(" ", strip=True)
         if not raw:
             continue
@@ -102,19 +110,31 @@ def jsonld_product(soup: BeautifulSoup) -> tuple[int | None, str | None, str | N
             types = typ if isinstance(typ, list) else [typ]
             if "Product" not in types:
                 continue
-            product_name = obj.get("name") or product_name
-            offers = obj.get("offers")
-            offers = offers if isinstance(offers, list) else [offers]
-            for offer in offers:
-                if not isinstance(offer, dict):
-                    continue
-                p = money(offer.get("price"))
-                currency = str(offer.get("priceCurrency", "")).upper()
-                if p and (not currency or currency == "CLP"):
-                    price = p
-                if offer.get("availability"):
-                    availability = str(offer["availability"])
-    return price, availability, product_name
+            product_name = str(obj.get("name") or "")
+            low = product_name.lower()
+            score = sum(token in low for token in ("switch", "zelda", "40"))
+            if score >= 3:
+                candidates.append((score, obj))
+
+    if not candidates:
+        return None, None, None
+
+    _, obj = max(candidates, key=lambda item: item[0])
+    product_name = str(obj.get("name") or "") or None
+    offers = obj.get("offers")
+    offers = offers if isinstance(offers, list) else [offers]
+    prices: list[int] = []
+    availability = None
+    for offer in offers:
+        if not isinstance(offer, dict):
+            continue
+        currency = str(offer.get("priceCurrency", "")).upper()
+        p = money(offer.get("price"))
+        if p and (not currency or currency == "CLP"):
+            prices.append(p)
+        if offer.get("availability"):
+            availability = str(offer["availability"])
+    return (min(prices) if prices else None), availability, product_name
 
 def fallback_price(text: str) -> int | None:
     values = []
@@ -127,14 +147,17 @@ def fallback_price(text: str) -> int | None:
 def status_from(text: str, availability: str | None, http_status: int) -> str:
     if http_status == 404:
         return "page_missing"
-    av = (availability or "").lower()
-    if any(x in av for x in ("instock", "preorder", "presale", "limitedavailability")):
-        return "available"
-    if any(x in av for x in ("outofstock", "soldout", "discontinued")):
-        return "unavailable"
     low = " ".join(text.lower().split())
+
+    # La señal visible "Agotado/Fuera de stock" manda sobre JSON-LD desactualizado.
     if any(x in low for x in NEGATIVE):
         return "unavailable"
+
+    av = (availability or "").lower()
+    if any(x in av for x in ("outofstock", "soldout", "discontinued")):
+        return "unavailable"
+    if any(x in av for x in ("instock", "preorder", "presale", "limitedavailability")):
+        return "available"
     if any(x in low for x in POSITIVE):
         return "available"
     return "unknown"
@@ -144,19 +167,29 @@ def inspect(s: requests.Session, name: str, url: str) -> Product:
         r = s.get(url, timeout=TIMEOUT, allow_redirects=True)
         if r.status_code == 404:
             return Product(name, url, 404, None, "page_missing", None)
-        if r.status_code == 429 or r.status_code >= 500:
+        if r.status_code in (403, 429) or r.status_code >= 500:
+            # 403 suele ser Cloudflare/anti-bot; no lo convertimos en cambio de stock.
             return Product(name, url, r.status_code, None, "error", None)
         soup = BeautifulSoup(r.text, "html.parser")
         text = soup.get_text(" ", strip=True)
         price_json, availability, product_name = jsonld_product(soup)
         title = product_name or (soup.title.get_text(" ", strip=True) if soup.title else None)
+
+        # TodoJuegos declara explícitamente "Precio x Confirmar"; no inferimos un precio
+        # desde productos destacados o relacionados del resto de la página.
+        low = " ".join(text.lower().split())
+        if "todojuegos.cl" in urllib.parse.urlparse(url).netloc.lower() and "precio x confirmar" in low:
+            parsed_price = None
+        else:
+            parsed_price = price_json or fallback_price(text)
+
         return Product(
             name=name,
             url=url,
             http=r.status_code,
             title=title,
             status=status_from(text, availability, r.status_code),
-            price_clp=price_json or fallback_price(text),
+            price_clp=parsed_price,
         )
     except requests.RequestException:
         return Product(name, url, None, None, "error", None)
