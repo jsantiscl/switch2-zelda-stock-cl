@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "switch2-zelda-stock-cl",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-21",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "vars": {
+    "GITHUB_OWNER": "jsantiscl",
+    "GITHUB_REPO": "switch2-zelda-stock-cl"
+  }
+}
