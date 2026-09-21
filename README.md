@@ -64,3 +64,30 @@ Agrega un objeto a `stores.json`:
 ## Avisos
 
 El scraper usa datos estructurados `Product/Offer` cuando la tienda los publica y, como respaldo, analiza expresiones como `agotado`, `sin stock`, `preventa`, `agregar al carrito`, etc. Ningún scraper puede garantizar 100% de precisión ante cambios de diseño, CAPTCHA o bloqueos anti-bot; por eso cada alerta incluye el enlace para confirmar directamente antes de comprar.
+
+
+## Cómo comprobar que el robot está corriendo solo
+
+En la pestaña **Actions** del repositorio, las ejecuciones ahora se identifican así:
+
+- **🤖 AUTO · revisión cada 5 min**: ejecución disparada por el cron de GitHub. Esta es la que confirma que el robot está funcionando automáticamente.
+- **🧪 MANUAL · revisión solicitada**: ejecución iniciada con el botón *Run workflow*.
+- **🔧 CÓDIGO · validación del monitor**: ejecución iniciada porque se modificó el código/configuración.
+
+La programación automática usa:
+
+```yaml
+- cron: '*/5 * * * *'
+```
+
+GitHub Actions usa UTC para el cron. El intervalo mínimo admitido por GitHub es 5 minutos. La ejecución puede comenzar algunos minutos tarde cuando GitHub tiene alta carga, por lo que hay que comprobar la secuencia de ejecuciones **🤖 AUTO** y no exigir que empiecen exactamente al segundo.
+
+Dentro de cada ejecución, **Summary** muestra además:
+
+- tipo de evento;
+- número de ejecución;
+- hora UTC;
+- si revisó las tiendas conocidas;
+- si hizo también descubrimiento amplio de tiendas nuevas.
+
+El descubrimiento amplio se ejecuta aproximadamente una de cada tres corridas automáticas (cerca de cada 15 minutos), mientras que las tiendas conocidas se revisan en todas.
