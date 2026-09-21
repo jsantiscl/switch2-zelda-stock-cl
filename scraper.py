@@ -24,7 +24,7 @@ UA = (
 NEGATIVE = (
     "agotado", "sin existencias", "sin stock", "fuera de stock",
     "sold out", "out of stock", "producto no disponible", "temporalmente agotado",
-    "actualmente no se encuentra disponible", "no tendrá preventa", "no tendra preventa",
+    "no tendrá preventa", "no tendra preventa",
 )
 POSITIVE = (
     "agregar al carrito", "añadir al carrito", "anadir al carrito",
