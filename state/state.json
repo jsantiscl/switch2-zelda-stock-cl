@@ -1,6 +1,62 @@
 {
-  "version": 2,
-  "initialized": false,
-  "stores": {},
-  "discovered": {}
+  "discovered": {},
+  "initialized": true,
+  "stores": {
+    "https://bestmart.cl/products/consola-nintendo-switch-2-the-legend-of-zelda-edicion-40-aniversario": {
+      "last_changed_at": "2026-09-21T22:22:10+00:00",
+      "last_seen_at": "2026-09-21T22:22:10+00:00",
+      "name": "Bestmart",
+      "snapshot": {
+        "http": 200,
+        "price_clp": 669990,
+        "status": "unavailable",
+        "title": "Nintendo Switch 2 Zelda Edición 40 Aniversario | Bestmart"
+      }
+    },
+    "https://playservice.cl/producto/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary/": {
+      "last_changed_at": "2026-09-21T22:22:13+00:00",
+      "last_seen_at": "2026-09-21T22:22:13+00:00",
+      "name": "Play Service",
+      "snapshot": {
+        "http": 200,
+        "price_clp": 689990,
+        "status": "unavailable",
+        "title": "Preventa Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary – Play Service Talca – Videojuegos y consolas"
+      }
+    },
+    "https://www.mathogames.cl/consolas-switch-2/2538-preventa-dia-1-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html": {
+      "last_changed_at": "2026-09-21T22:22:13+00:00",
+      "last_seen_at": "2026-09-21T22:22:13+00:00",
+      "name": "Mathogames",
+      "snapshot": {
+        "http": 200,
+        "price_clp": 699990,
+        "status": "unavailable",
+        "title": "PREVENTA DÍA 1 / Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary"
+      }
+    },
+    "https://www.santogames.cl/nintendo-switch-2-the-legend-of-zelda-40%C2%BA-aniversario": {
+      "last_changed_at": "2026-09-21T22:22:10+00:00",
+      "last_seen_at": "2026-09-21T22:22:10+00:00",
+      "name": "Santo Games",
+      "snapshot": {
+        "http": 200,
+        "price_clp": null,
+        "status": "unavailable",
+        "title": "Nintendo Switch 2 – The Legend of Zelda 40.º Aniversario"
+      }
+    },
+    "https://www.todojuegos.cl/Productos/NS2/Consola-Switch-2-Zelda-40th-Aniversario/": {
+      "last_changed_at": "2026-09-21T22:22:16+00:00",
+      "last_seen_at": "2026-09-21T22:22:16+00:00",
+      "name": "TodoJuegos",
+      "snapshot": {
+        "http": 200,
+        "price_clp": null,
+        "status": "unavailable",
+        "title": "Consola Switch 2 Zelda 40th Aniversario - Consolas para NS2 -  Nintendo Switch 2 (Chile)"
+      }
+    }
+  },
+  "version": 2
 }
