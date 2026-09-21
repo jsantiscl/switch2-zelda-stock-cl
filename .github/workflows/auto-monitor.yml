@@ -1,0 +1,122 @@
+name: AUTO · Switch 2 Zelda cada 5 min
+
+run-name: ${{ github.event_name == 'schedule' && '🤖 AUTO · revisión cada 5 min' || '🧪 TEST AUTO · ejecución manual' }}
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: switch2-zelda-stock-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sincronizar con main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Definir alcance
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          DISCOVER='false'
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DISCOVER='true'
+          elif (( GITHUB_RUN_NUMBER % 3 == 0 )); then
+            DISCOVER='true'
+          fi
+
+          echo "discover=$DISCOVER" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### 🤖 Monitor automático"
+            echo ""
+            echo "- Evento: **${{ github.event_name }}**"
+            echo "- Run: **#$GITHUB_RUN_NUMBER**"
+            echo "- Hora UTC: **$(date -u '+%Y-%m-%d %H:%M:%S')**"
+            echo "- Tiendas conocidas: **sí**"
+            echo "- Mercado Libre · Nintendo Oficial: **sí**"
+            echo "- Descubrimiento amplio: **$DISCOVER**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Revisar tiendas
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          DISCOVER=''
+          if [[ "${{ steps.mode.outputs.discover }}" == "true" ]]; then
+            DISCOVER='--discover'
+          fi
+          python monitor.py --state state/state.json --report report.md $DISCOVER
+
+      - name: Guardar nuevo estado
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- state/state.json; then
+            echo 'Estado sin cambios.'
+            exit 0
+          fi
+
+          git config user.name 'switch-stock-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add state/state.json
+          git commit -m 'chore: actualizar estado del monitor [skip ci]'
+
+          # Reintento corto por si otra corrida actualizó el estado mientras ésta trabajaba.
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Reintento $attempt al guardar estado..."
+            git rebase --abort 2>/dev/null || true
+            sleep 2
+          done
+          exit 1
+
+      - name: Avisar mediante GitHub Issue
+        if: steps.check.outputs.changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          COUNT='${{ steps.check.outputs.count }}'
+          TITLE="🚨 Switch 2 Zelda 40th: ${COUNT} cambio(s) detectado(s)"
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TITLE" \
+            --body-file report.md \
+            --assignee "$GITHUB_REPOSITORY_OWNER" \
+          || gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TITLE" \
+            --body-file report.md
