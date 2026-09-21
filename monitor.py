@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from scraper import Product, discover, inspect, make_session
+from scraper import Product, discover, discover_mercadolibre_official, inspect, make_session
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -83,6 +83,10 @@ def main() -> int:
 
     targets = {item["url"]: item["name"] for item in known}
     for url, item in state["discovered"].items():
+        # Las publicaciones oficiales de Mercado Libre se revisan mediante
+        # su descubrimiento dedicado, no mediante scraping directo genérico.
+        if item.get("source") == "mercadolibre_official":
+            continue
         targets.setdefault(url, item.get("name") or url)
 
     for url, name in targets.items():
@@ -106,8 +110,41 @@ def main() -> int:
                 "last_changed_at": now(),
             }
 
+    # Mercado Libre / Tienda Oficial Nintendo se revisa en TODAS las corridas
+    # (cada 5 minutos), independientemente de la búsqueda amplia.
+    ml_candidates = discover_mercadolibre_official(session, set())
+    for current in ml_candidates:
+        if current.status in ("error", "unknown"):
+            continue
+
+        previous_entry = state["stores"].get(current.url)
+        previous = previous_entry.get("snapshot") if previous_entry else None
+        is_new = previous_entry is None
+
+        if initialized and is_new:
+            alerts.append(describe(current.name, None, current, new_listing=True))
+        elif initialized and previous and important_change(previous, current):
+            alerts.append(describe(current.name, previous, current))
+
+        if is_new or important_change(previous or {}, current):
+            state["stores"][current.url] = {
+                "name": current.name,
+                "snapshot": current.snapshot(),
+                "last_changed_at": now(),
+            }
+
+        state["discovered"][current.url] = {
+            "name": current.name,
+            "url": current.url,
+            "source": "mercadolibre_official",
+            "found_at": (
+                state["discovered"].get(current.url, {}).get("found_at")
+                or now()
+            ),
+        }
+
     if args.discover:
-        known_urls = set(targets)
+        known_urls = set(targets) | set(state["discovered"])
         for current in discover(session, known_urls):
             if current.url in known_urls:
                 continue
