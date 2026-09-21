@@ -40,6 +40,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Sincronizar con main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+
       - name: Preparar Python
         uses: actions/setup-python@v5
         with:
