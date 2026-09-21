@@ -4,7 +4,6 @@
   "stores": {
     "https://bestmart.cl/products/consola-nintendo-switch-2-the-legend-of-zelda-edicion-40-aniversario": {
       "last_changed_at": "2026-09-21T22:22:10+00:00",
-      "last_seen_at": "2026-09-21T22:22:10+00:00",
       "name": "Bestmart",
       "snapshot": {
         "http": 200,
@@ -15,7 +14,6 @@
     },
     "https://playservice.cl/producto/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary/": {
       "last_changed_at": "2026-09-21T22:22:13+00:00",
-      "last_seen_at": "2026-09-21T22:22:13+00:00",
       "name": "Play Service",
       "snapshot": {
         "http": 200,
@@ -26,7 +24,6 @@
     },
     "https://www.mathogames.cl/consolas-switch-2/2538-preventa-dia-1-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html": {
       "last_changed_at": "2026-09-21T22:22:13+00:00",
-      "last_seen_at": "2026-09-21T22:22:13+00:00",
       "name": "Mathogames",
       "snapshot": {
         "http": 200,
@@ -36,18 +33,17 @@
       }
     },
     "https://www.santogames.cl/nintendo-switch-2-the-legend-of-zelda-40%C2%BA-aniversario": {
-      "last_changed_at": "2026-09-21T22:24:15+00:00",
+      "last_changed_at": "2026-09-21T22:22:10+00:00",
       "name": "Santo Games",
       "snapshot": {
         "http": 200,
         "price_clp": null,
-        "status": "available",
+        "status": "unavailable",
         "title": "Nintendo Switch 2 – The Legend of Zelda 40.º Aniversario"
       }
     },
     "https://www.todojuegos.cl/Productos/NS2/Consola-Switch-2-Zelda-40th-Aniversario/": {
       "last_changed_at": "2026-09-21T22:22:16+00:00",
-      "last_seen_at": "2026-09-21T22:22:16+00:00",
       "name": "TodoJuegos",
       "snapshot": {
         "http": 200,
