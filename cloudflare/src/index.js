@@ -437,11 +437,27 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   state.discovered ||= {};
   const initialized = Boolean(state.initialized);
   const alerts = [];
+  const checks = [];
   let dirty = false;
+  let reliableStores = 0;
+  let skippedStores = 0;
+  let discoveredNew = 0;
 
   for (const store of STORES) {
     const current = await inspectStore(store);
-    if (["error", "unknown"].includes(current.status)) continue;
+    checks.push({
+      name: store.name,
+      status: current.status,
+      price_clp: current.price_clp,
+      http: current.http,
+    });
+
+    if (["error", "unknown"].includes(current.status)) {
+      skippedStores += 1;
+      continue;
+    }
+
+    reliableStores += 1;
 
     const old = state.stores[current.url]?.snapshot || null;
     const snapshot = {
@@ -463,6 +479,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   }
 
   const ml = await inspectMercadoLibreOfficial();
+  const mercadoLibreResult = ml ? "candidate_detected" : "no_candidate_or_unreadable";
   if (ml) {
     const key = "mercadolibre:nintendo-official:zelda40";
     const old = state.stores[key]?.snapshot || null;
@@ -485,7 +502,8 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   }
 
   const minute = new Date(scheduledTime).getUTCMinutes();
-  if (forceDiscovery || minute % 15 === 0) {
+  const discoveryRan = forceDiscovery || minute % 15 === 0;
+  if (discoveryRan) {
     const knownUrls = new Set([
       ...STORES.map((s) => s.url),
       ...Object.keys(state.discovered),
@@ -509,6 +527,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
         last_changed_at: new Date(scheduledTime).toISOString(),
       };
       if (initialized) alerts.push(describe(current, null, true));
+      discoveredNew += 1;
       dirty = true;
     }
   }
@@ -534,15 +553,50 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     await createIssue(env, `🚨 Switch 2 Zelda 40th: ${alerts.length} novedad(es)`, body);
   }
 
-  return { alerts: alerts.length, dirty, initialized: true };
+  return {
+    alerts: alerts.length,
+    dirty,
+    initialized: true,
+    checked_stores: STORES.length,
+    reliable_stores: reliableStores,
+    skipped_stores: skippedStores,
+    mercado_libre: mercadoLibreResult,
+    discovery_ran: discoveryRan,
+    discovered_new: discoveredNew,
+    stores: checks,
+  };
 }
 
 export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(
-      runMonitor(env, controller.scheduledTime).catch((err) => {
-        console.error("scheduled monitor failed", err?.stack || String(err));
-      }),
+      runMonitor(env, controller.scheduledTime)
+        .then((result) => {
+          const readable =
+            `MONITOR OK · ${result.checked_stores} tiendas · ` +
+            `${result.reliable_stores} lecturas fiables · ` +
+            `${result.skipped_stores} bloqueadas/no concluyentes · ` +
+            `${result.alerts} alertas · ` +
+            `Mercado Libre: ${result.mercado_libre} · ` +
+            `búsqueda amplia: ${result.discovery_ran ? "sí" : "no"} · ` +
+            `nuevas: ${result.discovered_new}`;
+
+          console.log(readable);
+          console.log(JSON.stringify({
+            event: "monitor_cycle",
+            ok: true,
+            scheduled_time: new Date(controller.scheduledTime).toISOString(),
+            ...result,
+          }));
+        })
+        .catch((err) => {
+          console.error(JSON.stringify({
+            event: "monitor_cycle",
+            ok: false,
+            scheduled_time: new Date(controller.scheduledTime).toISOString(),
+            error: err?.stack || String(err),
+          }));
+        }),
     );
   },
 
@@ -569,6 +623,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
       const result = await runMonitor(env, Date.now(), true);
+      console.log(`MANUAL RUN OK · ${result.checked_stores} tiendas · ${result.alerts} alertas · nuevas: ${result.discovered_new}`);
       return Response.json({ ok: true, ...result });
     }
 
