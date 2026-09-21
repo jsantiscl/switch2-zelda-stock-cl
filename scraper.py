@@ -237,12 +237,18 @@ ML_NINTENDO_STORE = "https://www.mercadolibre.cl/tienda/nintendo"
 def ml_target_title(text: str) -> bool:
     low = " ".join(text.lower().split())
     has_core = all(token in low for token in ("switch", "zelda", "40"))
-    has_console = "consola" in low or "system" in low
     has_anniversary = any(token in low for token in (
         "40th", "40.º", "40º", "40°", "40 aniversario", "40th anniversary",
         "edición 40", "edicion 40",
     ))
-    return has_core and has_console and has_anniversary
+    # El 40.º aniversario es el filtro decisivo: evita confundir juegos Zelda de Switch 2.
+    return has_core and has_anniversary
+
+def canonical_ml_url(url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    if "mercadolibre.cl" not in parsed.netloc.lower():
+        return url.split("#", 1)[0]
+    return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
 
 def ml_is_official_nintendo(corpus: str) -> bool:
     low = " ".join(corpus.lower().split())
@@ -287,7 +293,7 @@ def discover_mercadolibre_official(
                     candidate_title = " ".join(x for x in parts if x).strip()
                     if not ml_target_title(candidate_title):
                         continue
-                    url = urllib.parse.urljoin(ML_NINTENDO_STORE, a["href"]).split("#", 1)[0]
+                    url = canonical_ml_url(urllib.parse.urljoin(ML_NINTENDO_STORE, a["href"]))
                     host = urllib.parse.urlparse(url).netloc.lower()
                     if "mercadolibre.cl" not in host or url in seen:
                         continue
@@ -305,7 +311,7 @@ def discover_mercadolibre_official(
     ]
     for query in queries:
         for result_title, url in bing_rss(s, query):
-            url = url.split("#", 1)[0]
+            url = canonical_ml_url(url)
             if url in seen:
                 continue
             host = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
@@ -350,7 +356,7 @@ def discover(s: requests.Session, known_urls: set[str]) -> list[Product]:
             host = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
             if not host.endswith(".cl"):
                 continue
-            if host == "mercadolibre.cl":
+            if host == "mercadolibre.cl" or host.endswith(".mercadolibre.cl"):
                 # Mercado Libre se maneja aparte para exigir Tienda Oficial Nintendo.
                 continue
             try:
