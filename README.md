@@ -23,6 +23,7 @@ Robot para detectar stock, preventas, cambios de precio y publicaciones nuevas e
 - Mathogames
 - TodoJuegos
 - WePlay
+- Mercado Libre · Tienda Oficial Nintendo (búsqueda dedicada cada 5 minutos)
 
 La lista está en `stores.json` y se puede ampliar fácilmente.
 
@@ -91,3 +92,10 @@ Dentro de cada ejecución, **Summary** muestra además:
 - si hizo también descubrimiento amplio de tiendas nuevas.
 
 El descubrimiento amplio se ejecuta aproximadamente una de cada tres corridas automáticas (cerca de cada 15 minutos), mientras que las tiendas conocidas se revisan en todas.
+
+
+## Mercado Libre · Tienda Oficial Nintendo
+
+El monitor trata Mercado Libre de forma especial: no vigila una URL de producto fija, porque la edición Zelda 40th puede aparecer por primera vez con una publicación nueva.
+
+En **cada corrida automática** se revisa la Tienda Oficial Nintendo y se hace una búsqueda específica para detectar títulos que incluyan Switch 2 + Zelda + 40.º aniversario. Los resultados de Mercado Libre solo se aceptan cuando se puede verificar que corresponden a la **Tienda Oficial Nintendo**, evitando alertas por vendedores terceros, juegos o accesorios Zelda.
