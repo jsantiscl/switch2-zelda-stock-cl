@@ -37,7 +37,7 @@ def important_change(old: dict[str, Any], new: Product) -> bool:
     if old.get("http") != new.http:
         return True
     old_price = old.get("price_clp")
-    if old_price and new.price_clp and old_price != new.price_clp:
+    if new.price_clp is not None and old_price != new.price_clp:
         return True
     return False
 
@@ -97,12 +97,12 @@ def main() -> int:
             alerts.append(describe(name, previous, current))
 
         changed = not previous or important_change(previous, current)
-        state["stores"][url] = {
-            "name": name,
-            "snapshot": current.snapshot(),
-            "last_seen_at": now(),
-            "last_changed_at": now() if changed else previous_entry.get("last_changed_at"),
-        }
+        if changed:
+            state["stores"][url] = {
+                "name": name,
+                "snapshot": current.snapshot(),
+                "last_changed_at": now(),
+            }
 
     if args.discover:
         known_urls = set(targets)
