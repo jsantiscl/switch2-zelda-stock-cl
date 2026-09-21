@@ -87,7 +87,9 @@ def main() -> int:
 
     for url, name in targets.items():
         current = inspect(session, name, url)
-        if current.status == "error":
+        # Estados no concluyentes o desafíos anti-bot no deben reemplazar
+        # el último estado fiable ni generar alertas falsas.
+        if current.status in ("error", "unknown"):
             continue
 
         previous_entry = state["stores"].get(url)
