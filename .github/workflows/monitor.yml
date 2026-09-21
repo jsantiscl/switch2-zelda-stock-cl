@@ -6,10 +6,10 @@ on:
     paths-ignore:
       - 'state/**'
   schedule:
-    # Tiendas conocidas: cada 10 minutos.
-    - cron: '3,13,23,33,43,53 * * * *'
-    # Descubrir tiendas/publicaciones nuevas: cada 2 horas.
-    - cron: '7 */2 * * *'
+    # Tiendas conocidas: cada 5 minutos (mínimo admitido por GitHub Actions).
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+    # Descubrir tiendas/publicaciones nuevas: cada 15 minutos.
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
     inputs:
       discover:
@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           DISCOVER=''
-          if [[ "${{ github.event.schedule }}" == "7 */2 * * *" || "${{ github.event_name }}" == "push" ]]; then
+          if [[ "${{ github.event.schedule }}" == "4,19,34,49 * * * *" || "${{ github.event_name }}" == "push" ]]; then
             DISCOVER='--discover'
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.discover }}" == "true" ]]; then
             DISCOVER='--discover'
