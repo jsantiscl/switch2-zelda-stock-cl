@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           DISCOVER=''
-          if [[ "${{ github.event.schedule }}" == "7 */2 * * *" ]]; then
+          if [[ "${{ github.event.schedule }}" == "7 */2 * * *" || "${{ github.event_name }}" == "push" ]]; then
             DISCOVER='--discover'
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.discover }}" == "true" ]]; then
             DISCOVER='--discover'
