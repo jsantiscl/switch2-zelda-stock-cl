@@ -178,17 +178,26 @@ def inspect(s: requests.Session, name: str, url: str) -> Product:
         # TodoJuegos declara explícitamente "Precio x Confirmar"; no inferimos un precio
         # desde productos destacados o relacionados del resto de la página.
         low = " ".join(text.lower().split())
-        if "todojuegos.cl" in urllib.parse.urlparse(url).netloc.lower() and "precio x confirmar" in low:
+        host = urllib.parse.urlparse(url).netloc.lower()
+        if "todojuegos.cl" in host and "precio x confirmar" in low:
             parsed_price = None
         else:
             parsed_price = price_json or fallback_price(text)
+
+        parsed_status = status_from(text, availability, r.status_code)
+
+        # Santo Games mantiene la palabra PREVENTA en la descripción incluso cuando
+        # la ficha no tiene precio ni venta habilitada. Sin precio de la consola,
+        # no la tratamos como una preventa comprable.
+        if "santogames.cl" in host and parsed_price is None:
+            parsed_status = "unavailable"
 
         return Product(
             name=name,
             url=url,
             http=r.status_code,
             title=title,
-            status=status_from(text, availability, r.status_code),
+            status=parsed_status,
             price_clp=parsed_price,
         )
     except requests.RequestException:
