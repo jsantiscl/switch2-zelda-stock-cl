@@ -1,6 +1,10 @@
 name: Revisar stock Switch 2 Zelda 40th
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'state/**'
   schedule:
     # Tiendas conocidas: cada 10 minutos.
     - cron: '3,13,23,33,43,53 * * * *'
