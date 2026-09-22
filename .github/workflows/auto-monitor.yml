@@ -1,15 +1,8 @@
-name: AUTO · Switch 2 Zelda cada 5 min
+name: LEGACY · prueba manual GitHub
 
-run-name: ${{ github.event_name == 'schedule' && '🤖 AUTO · revisión cada 5 min' || github.event_name == 'workflow_dispatch' && '🧪 TEST AUTO · ejecución manual' || '🔧 AUTO · validación de configuración' }}
+run-name: 🧪 LEGACY · prueba manual del monitor
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/auto-monitor.yml'
-  schedule:
-    # Cada 5 minutos, desplazado del minuto 00 para reducir retrasos del scheduler.
-    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
   workflow_dispatch:
 
 permissions:
