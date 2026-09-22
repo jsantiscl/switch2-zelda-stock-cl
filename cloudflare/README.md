@@ -102,3 +102,14 @@ curl -X POST \
 ```
 
 No es necesario para que el cron funcione.
+
+
+## Zona Gamer Iquique / Facebook
+
+El Worker también vigila la página pública de **Zona Gamer Iquique** como fuente social:
+
+- intento directo a Facebook cada 5 minutos;
+- respaldo mediante una página pública que replica publicaciones;
+- búsqueda web específica durante las rondas amplias de cada 15 minutos.
+
+Solo genera alerta si el contenido contiene señales conjuntas de **Switch 2 + Zelda + 40.º aniversario**, evitando avisos por publicaciones generales de Nintendo, Zelda o consolas.
