@@ -60,6 +60,40 @@ const POSITIVE = [
   "reserva ahora",
 ];
 
+const PREORDER_TERMS = [
+  "preventa",
+  "pre venta",
+  "pre-venta",
+  "reserva",
+  "reservas",
+  "reservar",
+  "preorder",
+  "pre-order",
+  "pre order",
+  "presale",
+  "pre-sale",
+];
+
+const EDITION_TERMS = [
+  "40th",
+  "40.º",
+  "40º",
+  "40°",
+  "40 aniversario",
+  "aniversario 40",
+  "40 años",
+  "40th anniversary",
+  "edición 40",
+  "edicion 40",
+  "edición zelda",
+  "edicion zelda",
+  "zelda edition",
+  "zelda edición",
+  "zelda edicion",
+  "edición especial zelda",
+  "edicion especial zelda",
+];
+
 const CHALLENGE = [
   "just a moment",
   "un momento",
@@ -214,14 +248,29 @@ async function inspectStore(store) {
   }
 }
 
+function hasPreorderSignal(text) {
+  const low = normalize(text).toLowerCase();
+  return PREORDER_TERMS.some((term) => low.includes(term));
+}
+
 function target40Nearby(text) {
   const low = normalize(text).toLowerCase();
-  const patterns = [
-    /switch\s*2.{0,220}zelda.{0,220}(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary))/i,
-    /zelda.{0,220}(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary)).{0,220}switch\s*2/i,
-    /(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary)).{0,220}zelda.{0,220}switch\s*2/i,
+  const strictPatterns = [
+    /switch\s*2.{0,260}zelda.{0,260}(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary|años)|aniversario\s*40)/i,
+    /zelda.{0,260}(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary|años)|aniversario\s*40).{0,260}switch\s*2/i,
+    /(?:40(?:th|\.?º|°)?|40\s*(?:aniversario|anniversary|años)|aniversario\s*40).{0,260}zelda.{0,260}switch\s*2/i,
   ];
-  return patterns.some((re) => re.test(low));
+  if (strictPatterns.some((re) => re.test(low))) return true;
+
+  // Variante frecuente en preventas: la tienda omite "40th" del título y usa
+  // "edición Zelda", "edición especial Zelda", etc.
+  const hasSwitch2 = /switch\s*2|nintendo\s*switch\s*2/i.test(low);
+  const hasZelda = low.includes("zelda");
+  const hasEdition = EDITION_TERMS.some((term) => low.includes(term));
+  const hasPreorder = PREORDER_TERMS.some((term) => low.includes(term));
+  const looksLikeConsole = /consola|console|sistema|bundle|pack/i.test(low);
+
+  return hasSwitch2 && hasZelda && hasEdition && hasPreorder && looksLikeConsole;
 }
 
 async function inspectMercadoLibreOfficial() {
@@ -271,7 +320,11 @@ async function inspectMercadoLibreOfficial() {
 function targetExcerpt(text) {
   const normalized = normalize(text);
   const lower = normalized.toLowerCase();
-  const anchors = ["zelda", "switch 2", "40th", "40 aniversario", "40º", "40°"];
+  const anchors = [
+    "zelda", "switch 2", "40th", "40 aniversario", "aniversario 40",
+    "40º", "40°", "40 años", "preventa", "pre venta", "pre-venta",
+    "reserva", "pre-order", "edición zelda", "edicion zelda"
+  ];
 
   for (const anchor of anchors) {
     let index = lower.indexOf(anchor);
@@ -383,6 +436,9 @@ async function inspectZonaGamerIquique(includeSearch = false) {
     const queries = [
       '"Zona Gamer Iquique" "Switch 2" Zelda 40',
       '"Zona Gamer Iquique" "Nintendo Switch 2" "40th"',
+      '"Zona Gamer Iquique" preventa "Switch 2" Zelda',
+      '"Zona Gamer Iquique" reserva "Switch 2" Zelda',
+      '"Zona Gamer Iquique" "edición Zelda" "Switch 2"',
     ];
 
     for (const query of queries) {
@@ -455,9 +511,18 @@ async function bingRss(query) {
 
 async function discoverNewStores(knownUrls) {
   const queries = [
-    '"Nintendo Switch 2" "Zelda" "40th" Chile',
-    '"Switch 2" "Zelda" "40" "preventa" Chile',
-    '"Consola Switch 2 Zelda 40" Chile',
+    '"Nintendo Switch 2" Zelda "40th Anniversary" Chile',
+    '"Nintendo Switch 2" Zelda "40 aniversario" Chile',
+    '"Switch 2" Zelda 40 preventa Chile',
+    '"Switch 2" Zelda "pre-venta" Chile',
+    '"Switch 2" Zelda reserva Chile',
+    '"Switch 2" "edición Zelda" preventa Chile',
+    '"Switch 2" "edicion Zelda" preventa Chile',
+    '"Consola Switch 2" Zelda preventa Chile',
+    '"Nintendo Switch 2" Zelda preorder Chile',
+    '"Nintendo Switch 2" Zelda "40 años" Chile',
+    '"The Legend of Zelda" "Switch 2" preventa Chile',
+    '"Zelda 40th" "Switch 2" preventa',
   ];
   const found = [];
   const seen = new Set(knownUrls);
@@ -486,6 +551,71 @@ async function discoverNewStores(knownUrls) {
       } catch (_) {}
     }
   }
+  return found;
+}
+
+
+const SOCIAL_HOSTS = [
+  "facebook.com",
+  "web.facebook.com",
+  "instagram.com",
+  "www.instagram.com",
+  "threads.net",
+  "www.threads.net",
+];
+
+function isSocialHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^www\./, "");
+  return SOCIAL_HOSTS.some((allowed) => {
+    const clean = allowed.replace(/^www\./, "");
+    return host === clean || host.endsWith("." + clean);
+  });
+}
+
+async function discoverSocialPreorders() {
+  const queries = [
+    'site:facebook.com "Switch 2" Zelda preventa Chile',
+    'site:facebook.com "Nintendo Switch 2" "edición Zelda" Chile',
+    'site:facebook.com "Switch 2" Zelda "40 aniversario" Chile',
+    'site:instagram.com "Switch 2" Zelda preventa Chile',
+    'site:instagram.com "Nintendo Switch 2" Zelda "40th" Chile',
+    'site:instagram.com "edición Zelda" "Switch 2" preventa Chile',
+  ];
+
+  const found = [];
+  const seen = new Set();
+
+  for (const query of queries) {
+    for (const item of await bingRss(query)) {
+      let host = "";
+      try {
+        host = new URL(item.url).hostname;
+      } catch (_) {
+        continue;
+      }
+      if (!isSocialHost(host)) continue;
+
+      const corpus = \`\${item.title || ""} \${item.description || ""}\`;
+      if (!target40Nearby(corpus)) continue;
+      if (!hasPreorderSignal(corpus)) continue;
+
+      const key = \`\${item.url}|\${normalize(corpus).toLowerCase()}\`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const excerpt = targetExcerpt(corpus) || corpus;
+      found.push({
+        name: \`Red social · \${host.replace(/^www\\./, "")}\`,
+        url: item.url,
+        status: "available",
+        price_clp: fallbackPrice(excerpt),
+        title: item.title || "Posible preventa Switch 2 Zelda",
+        source: "social_search",
+        fingerprint: fingerprint(excerpt),
+      });
+    }
+  }
+
   return found;
 }
 
@@ -704,6 +834,24 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     }
   }
   if (discoveryRan) {
+    state.social_discovered ||= {};
+    for (const current of await discoverSocialPreorders()) {
+      const key = `social-search:${current.fingerprint}`;
+      if (state.social_discovered[key]) continue;
+
+      state.social_discovered[key] = {
+        name: current.name,
+        url: current.url,
+        source: current.source,
+        fingerprint: current.fingerprint,
+        found_at: new Date(scheduledTime).toISOString(),
+      };
+
+      if (initialized) alerts.push(describe(current, null, true));
+      discoveredNew += 1;
+      dirty = true;
+    }
+
     const knownUrls = new Set([
       ...STORES.map((s) => s.url),
       ...Object.keys(state.discovered),
@@ -820,6 +968,8 @@ export default {
         zona_gamer_iquique_facebook: true,
         social_every_minutes: 5,
         discovery_every_minutes: 15,
+        expanded_preorder_search: true,
+        social_search: ["facebook", "instagram"],
         github_token_configured: Boolean(env.GITHUB_TOKEN),
         now: new Date().toISOString(),
       });
