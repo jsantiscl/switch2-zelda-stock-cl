@@ -596,6 +596,7 @@ export default {
             scheduled_time: new Date(controller.scheduledTime).toISOString(),
             error: err?.stack || String(err),
           }));
+          throw err;
         }),
     );
   },
@@ -613,6 +614,7 @@ export default {
         known_stores: STORES.map((s) => s.name),
         mercado_libre_official: true,
         discovery_every_minutes: 15,
+        github_token_configured: Boolean(env.GITHUB_TOKEN),
         now: new Date().toISOString(),
       });
     }
