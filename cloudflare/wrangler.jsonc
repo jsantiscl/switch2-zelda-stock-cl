@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true
   },
+  "secrets": {
+    "required": ["GITHUB_TOKEN"]
+  },
   "triggers": {
     "crons": ["* * * * *"]
   },
