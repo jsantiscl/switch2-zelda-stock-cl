@@ -312,11 +312,11 @@ async function inspectZonaGamerIquique(includeSearch = false) {
     });
 
     if (!r.ok) {
-      statuses.push(\`facebook_http_\${r.status}\`);
+      statuses.push(`facebook_http_${r.status}`);
     } else {
       const html = await r.text();
       const title = pageTitle(html) || "";
-      const first = \`\${title} \${normalize(html.slice(0, 30000))}\`.toLowerCase();
+      const first = `${title} ${normalize(html.slice(0, 30000))}`.toLowerCase();
       const fbBlocked = [
         ...CHALLENGE,
         "log in to facebook",
@@ -355,7 +355,7 @@ async function inspectZonaGamerIquique(includeSearch = false) {
       headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" },
     });
     if (!r.ok) {
-      statuses.push(\`mirror_http_\${r.status}\`);
+      statuses.push(`mirror_http_${r.status}`);
     } else {
       const html = await r.text();
       const excerpt = targetExcerpt(html);
@@ -387,7 +387,7 @@ async function inspectZonaGamerIquique(includeSearch = false) {
 
     for (const query of queries) {
       for (const item of await bingRss(query)) {
-        const corpus = \`\${item.title || ""} \${item.description || ""}\`;
+        const corpus = `${item.title || ""} ${item.description || ""}`;
         const excerpt = targetExcerpt(corpus);
         if (!excerpt) continue;
 
