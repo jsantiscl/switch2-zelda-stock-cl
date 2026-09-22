@@ -724,13 +724,42 @@ async function saveState(env, state, sha) {
 
 async function createIssue(env, title, body) {
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/issues`;
-  const payload = { title, body, assignees: [env.GITHUB_OWNER] };
-  const r = await fetch(url, {
+  const notifyUser = "Baaaaar1";
+  const mentionedBody =
+    `📣 Aviso también para @${notifyUser}\n\n` + body;
+
+  // Intentamos asignar el Issue a ambos usuarios.
+  let payload = {
+    title,
+    body: mentionedBody,
+    assignees: [env.GITHUB_OWNER, notifyUser],
+  };
+
+  let r = await fetch(url, {
     method: "POST",
     headers: { ...githubHeaders(env), "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!r.ok) throw new Error(`GitHub issue POST failed: ${r.status} ${await r.text()}`);
+
+  // GitHub puede rechazar un assignee que no tenga permisos suficientes en el repo.
+  // En ese caso creamos igualmente el Issue asignado al dueño y mantenemos la
+  // mención @Baaaaar1 en el cuerpo, que sirve como notificación alternativa.
+  if (r.status === 422) {
+    payload = {
+      title,
+      body: mentionedBody,
+      assignees: [env.GITHUB_OWNER],
+    };
+    r = await fetch(url, {
+      method: "POST",
+      headers: { ...githubHeaders(env), "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  if (!r.ok) {
+    throw new Error(`GitHub issue POST failed: ${r.status} ${await r.text()}`);
+  }
 }
 
 async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = false) {
@@ -971,6 +1000,7 @@ export default {
         expanded_preorder_search: true,
         social_search: ["facebook", "instagram"],
         github_token_configured: Boolean(env.GITHUB_TOKEN),
+        notification_users: [env.GITHUB_OWNER, "Baaaaar1"],
         now: new Date().toISOString(),
       });
     }
