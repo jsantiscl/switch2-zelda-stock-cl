@@ -595,17 +595,17 @@ async function discoverSocialPreorders() {
       }
       if (!isSocialHost(host)) continue;
 
-      const corpus = \`\${item.title || ""} \${item.description || ""}\`;
+      const corpus = `${item.title || ""} ${item.description || ""}`;
       if (!target40Nearby(corpus)) continue;
       if (!hasPreorderSignal(corpus)) continue;
 
-      const key = \`\${item.url}|\${normalize(corpus).toLowerCase()}\`;
+      const key = `${item.url}|${normalize(corpus).toLowerCase()}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
       const excerpt = targetExcerpt(corpus) || corpus;
       found.push({
-        name: \`Red social · \${host.replace(/^www\\./, "")}\`,
+        name: `Red social · ${host.replace(/^www\\./, "")}`,
         url: item.url,
         status: "available",
         price_clp: fallbackPrice(excerpt),
