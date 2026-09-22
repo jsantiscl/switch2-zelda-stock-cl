@@ -26,6 +26,8 @@ const STORES = [
 ];
 
 const ML_STORE_URL = "https://www.mercadolibre.cl/tienda/nintendo";
+const ZONA_GAMER_FB_URL = "https://web.facebook.com/p/Zona-Gamer-Iquique-100063732433382/";
+const ZONA_GAMER_MIRROR_URL = "https://www.govern1.com/CL/Iquique/100213088361257/Zona-Gamer-Iquique";
 const STATE_PATH = "state/cloudflare-state.json";
 
 const USER_AGENT =
@@ -265,6 +267,159 @@ async function inspectMercadoLibreOfficial() {
   }
 }
 
+
+function targetExcerpt(text) {
+  const normalized = normalize(text);
+  const lower = normalized.toLowerCase();
+  const anchors = ["zelda", "switch 2", "40th", "40 aniversario", "40º", "40°"];
+
+  for (const anchor of anchors) {
+    let index = lower.indexOf(anchor);
+    while (index >= 0) {
+      const start = Math.max(0, index - 600);
+      const end = Math.min(normalized.length, index + 900);
+      const excerpt = normalized.slice(start, end);
+      if (target40Nearby(excerpt)) return excerpt;
+      index = lower.indexOf(anchor, index + anchor.length);
+    }
+  }
+  return target40Nearby(normalized) ? normalized.slice(0, 1400) : null;
+}
+
+function fingerprint(text) {
+  let hash = 2166136261;
+  const value = normalize(text).toLowerCase();
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+async function inspectZonaGamerIquique(includeSearch = false) {
+  const candidates = [];
+  const statuses = [];
+
+  // 1) Intento directo a la página pública de Facebook.
+  try {
+    const r = await fetch(ZONA_GAMER_FB_URL, {
+      redirect: "follow",
+      headers: {
+        "user-agent": USER_AGENT,
+        "accept-language": "es-CL,es;q=0.9",
+        accept: "text/html,application/xhtml+xml",
+      },
+    });
+
+    if (!r.ok) {
+      statuses.push(\`facebook_http_\${r.status}\`);
+    } else {
+      const html = await r.text();
+      const title = pageTitle(html) || "";
+      const first = \`\${title} \${normalize(html.slice(0, 30000))}\`.toLowerCase();
+      const fbBlocked = [
+        ...CHALLENGE,
+        "log in to facebook",
+        "inicia sesión en facebook",
+        "create new account",
+      ].some((x) => first.includes(x));
+
+      if (fbBlocked) {
+        statuses.push("facebook_blocked_or_login");
+      } else {
+        const excerpt = targetExcerpt(html);
+        if (excerpt) {
+          candidates.push({
+            name: "Zona Gamer Iquique · Facebook",
+            url: ZONA_GAMER_FB_URL,
+            status: "available",
+            price_clp: fallbackPrice(excerpt),
+            title: "Posible publicación Switch 2 Zelda 40th en Zona Gamer Iquique",
+            source: "zona_gamer_facebook",
+            fingerprint: fingerprint(excerpt),
+          });
+          statuses.push("facebook_candidate_detected");
+        } else {
+          statuses.push("facebook_not_found");
+        }
+      }
+    }
+  } catch (_) {
+    statuses.push("facebook_fetch_error");
+  }
+
+  // 2) Espejo público de publicaciones de Zona Gamer Iquique.
+  try {
+    const r = await fetch(ZONA_GAMER_MIRROR_URL, {
+      redirect: "follow",
+      headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" },
+    });
+    if (!r.ok) {
+      statuses.push(\`mirror_http_\${r.status}\`);
+    } else {
+      const html = await r.text();
+      const excerpt = targetExcerpt(html);
+      if (excerpt) {
+        candidates.push({
+          name: "Zona Gamer Iquique · publicación pública",
+          url: ZONA_GAMER_MIRROR_URL,
+          status: "available",
+          price_clp: fallbackPrice(excerpt),
+          title: "Posible publicación Switch 2 Zelda 40th en Zona Gamer Iquique",
+          source: "zona_gamer_mirror",
+          fingerprint: fingerprint(excerpt),
+        });
+        statuses.push("mirror_candidate_detected");
+      } else {
+        statuses.push("mirror_not_found");
+      }
+    }
+  } catch (_) {
+    statuses.push("mirror_fetch_error");
+  }
+
+  // 3) Respaldo por buscador. Solo se usa en las rondas amplias.
+  if (includeSearch) {
+    const queries = [
+      '"Zona Gamer Iquique" "Switch 2" Zelda 40',
+      '"Zona Gamer Iquique" "Nintendo Switch 2" "40th"',
+    ];
+
+    for (const query of queries) {
+      for (const item of await bingRss(query)) {
+        const corpus = \`\${item.title || ""} \${item.description || ""}\`;
+        const excerpt = targetExcerpt(corpus);
+        if (!excerpt) continue;
+
+        candidates.push({
+          name: "Zona Gamer Iquique · resultado indexado",
+          url: item.url || ZONA_GAMER_FB_URL,
+          status: "available",
+          price_clp: fallbackPrice(excerpt),
+          title: item.title || "Publicación Zona Gamer Iquique",
+          source: "zona_gamer_search",
+          fingerprint: fingerprint(excerpt),
+        });
+      }
+    }
+    statuses.push("search_checked");
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const key = candidate.fingerprint || candidate.url;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(candidate);
+  }
+
+  return {
+    monitor_status: statuses.join("+") || "not_checked",
+    candidates: unique,
+  };
+}
+
 function xmlDecode(s = "") {
   return s
     .replace(/&amp;/g, "&")
@@ -285,7 +440,12 @@ async function bingRss(query) {
       const block = item[1];
       const title = block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "";
       const link = block.match(/<link>([\s\S]*?)<\/link>/i)?.[1] || "";
-      if (link) out.push({ title: xmlDecode(title).trim(), url: xmlDecode(link).trim() });
+      const description = block.match(/<description>([\s\S]*?)<\/description>/i)?.[1] || "";
+      if (link) out.push({
+        title: xmlDecode(title).trim(),
+        url: xmlDecode(link).trim(),
+        description: normalize(xmlDecode(description)),
+      });
     }
     return out;
   } catch (_) {
@@ -517,6 +677,32 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
 
   const minute = new Date(scheduledTime).getUTCMinutes();
   const discoveryRan = forceDiscovery || minute % 15 === 0;
+  const socialRan = forceDiscovery || minute % 5 === 0;
+  let zonaGamerResult = "not_checked";
+
+  if (socialRan) {
+    const zona = await inspectZonaGamerIquique(discoveryRan);
+    zonaGamerResult = zona.monitor_status;
+    state.social_discovered ||= {};
+
+    for (const current of zona.candidates) {
+      const key = `zona-gamer:${current.fingerprint}`;
+      if (state.social_discovered[key]) continue;
+
+      state.social_discovered[key] = {
+        name: current.name,
+        url: current.url,
+        source: current.source,
+        fingerprint: current.fingerprint,
+        found_at: new Date(scheduledTime).toISOString(),
+      };
+
+      if (initialized) {
+        alerts.push(describe(current, null, true));
+      }
+      dirty = true;
+    }
+  }
   if (discoveryRan) {
     const knownUrls = new Set([
       ...STORES.map((s) => s.url),
@@ -575,6 +761,8 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     reliable_stores: reliableStores,
     skipped_stores: skippedStores,
     mercado_libre: mercadoLibreResult,
+    zona_gamer: zonaGamerResult,
+    social_ran: socialRan,
     discovery_ran: discoveryRan,
     discovered_new: discoveredNew,
     stores: checks,
@@ -592,6 +780,8 @@ export default {
             `${result.skipped_stores} bloqueadas/no concluyentes · ` +
             `${result.alerts} alertas · ` +
             `Mercado Libre: ${result.mercado_libre} · ` +
+            `Zona Gamer: ${result.zona_gamer} · ` +
+            `social: ${result.social_ran ? "sí" : "no"} · ` +
             `búsqueda amplia: ${result.discovery_ran ? "sí" : "no"} · ` +
             `nuevas: ${result.discovered_new}`;
 
@@ -627,6 +817,8 @@ export default {
         interval: "1 minute",
         known_stores: STORES.map((s) => s.name),
         mercado_libre_official: true,
+        zona_gamer_iquique_facebook: true,
+        social_every_minutes: 5,
         discovery_every_minutes: 15,
         github_token_configured: Boolean(env.GITHUB_TOKEN),
         now: new Date().toISOString(),
