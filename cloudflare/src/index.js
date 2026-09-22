@@ -228,27 +228,40 @@ async function inspectMercadoLibreOfficial() {
       headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" },
       redirect: "follow",
     });
-    if (!response.ok) return null;
+
+    if (!response.ok) {
+      return { monitor_status: `http_${response.status}`, item: null };
+    }
+
     const html = await response.text();
     const title = pageTitle(html);
     const first = `${title || ""} ${normalize(html.slice(0, 25000))}`.toLowerCase();
-    if (CHALLENGE.some((x) => first.includes(x))) return null;
 
-    if (!target40Nearby(html)) return null;
+    if (CHALLENGE.some((x) => first.includes(x))) {
+      return { monitor_status: "blocked_or_challenge", item: null };
+    }
+
+    if (!target40Nearby(html)) {
+      return { monitor_status: "not_found", item: null };
+    }
 
     const visible = normalize(html);
     const price = fallbackPrice(visible);
+
     return {
-      name: "Mercado Libre · Nintendo Oficial",
-      url: ML_STORE_URL,
-      http: response.status,
-      status: "available",
-      price_clp: price,
-      title: "Nintendo Switch 2 Zelda 40th Anniversary detectada en Tienda Oficial Nintendo",
-      source: "mercadolibre_official",
+      monitor_status: "candidate_detected",
+      item: {
+        name: "Mercado Libre · Nintendo Oficial",
+        url: ML_STORE_URL,
+        http: response.status,
+        status: "available",
+        price_clp: price,
+        title: "Nintendo Switch 2 Zelda 40th Anniversary detectada en Tienda Oficial Nintendo",
+        source: "mercadolibre_official",
+      },
     };
   } catch (_) {
-    return null;
+    return { monitor_status: "fetch_error", item: null };
   }
 }
 
@@ -478,8 +491,9 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     }
   }
 
-  const ml = await inspectMercadoLibreOfficial();
-  const mercadoLibreResult = ml ? "candidate_detected" : "no_candidate_or_unreadable";
+  const mlCheck = await inspectMercadoLibreOfficial();
+  const mercadoLibreResult = mlCheck.monitor_status;
+  const ml = mlCheck.item;
   if (ml) {
     const key = "mercadolibre:nintendo-official:zelda40";
     const old = state.stores[key]?.snapshot || null;
