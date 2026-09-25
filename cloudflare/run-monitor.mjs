@@ -14,6 +14,8 @@ const env = {
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
   GITHUB_OWNER: owner,
   GITHUB_REPO: name,
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
 };
 
 if (!env.GITHUB_TOKEN) {
@@ -34,6 +36,7 @@ console.log(
     `social: ${result.social_ran ? "sí" : "no"}`,
     `búsqueda amplia: ${result.discovery_ran ? "sí" : "no"}`,
     `nuevas: ${result.discovered_new}`,
+    `Telegram: ${result.telegram_sent ? "enviado" : result.telegram_reason}`,
   ].join(" · "),
 );
 
