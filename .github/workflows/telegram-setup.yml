@@ -41,33 +41,52 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           CHATS=$(echo "$UPDATES" | jq -r '
-            [.result[] |
-              (.message.chat // .edited_message.chat // .channel_post.chat // .my_chat_member.chat // empty)
+            [
+              .result[]
+              | (.message.chat
+                 // .edited_message.chat
+                 // .channel_post.chat
+                 // .my_chat_member.chat
+                 // empty)
             ]
             | unique_by(.id)
             | .[]
-            | "| (.id) | (.type) | (.title // .username // .first_name // "sin nombre") |"
+            | [
+                (.id | tostring),
+                (.type // "desconocido"),
+                (.title // .username // .first_name // "sin nombre")
+              ]
+            | @tsv
           ')
 
           if [[ -z "$CHATS" ]]; then
             echo "No se detectaron chats todavía." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "En el grupo de Telegram envía un mensaje que mencione al bot, por ejemplo:" >> "$GITHUB_STEP_SUMMARY"
-            echo "`/start@${BOT_USER}`" >> "$GITHUB_STEP_SUMMARY"
+            echo "En el grupo de Telegram envía este comando:" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "\`/start@${BOT_USER}\`" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Luego vuelve a ejecutar este workflow." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "| Chat ID | Tipo | Nombre |" >> "$GITHUB_STEP_SUMMARY"
             echo "|---:|---|---|" >> "$GITHUB_STEP_SUMMARY"
-            echo "$CHATS" >> "$GITHUB_STEP_SUMMARY"
+            while IFS=$'\t' read -r CHAT_ID CHAT_TYPE CHAT_NAME; do
+              echo "| ${CHAT_ID} | ${CHAT_TYPE} | ${CHAT_NAME} |" >> "$GITHUB_STEP_SUMMARY"
+            done <<< "$CHATS"
           fi
 
           if [[ -n "${TELEGRAM_CHAT_ID:-}" ]]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "### Prueba de envío" >> "$GITHUB_STEP_SUMMARY"
 
-            RESPONSE=$(curl -fsS -X POST               "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"               -H "Content-Type: application/json"               -d "$(jq -nc                 --arg chat "${TELEGRAM_CHAT_ID}"                 --arg text "✅ Monitor Zelda configurado correctamente. Este grupo recibirá alertas de preventa/stock de la Nintendo Switch 2 edición Zelda 40th Anniversary."                 '{chat_id:$chat,text:$text,disable_web_page_preview:true}')"
-            )
+            PAYLOAD=$(jq -nc \
+              --arg chat "${TELEGRAM_CHAT_ID}" \
+              --arg text "✅ Monitor Zelda configurado correctamente. Este grupo recibirá alertas de preventa/stock de la Nintendo Switch 2 edición Zelda 40th Anniversary." \
+              '{chat_id:$chat,text:$text,disable_web_page_preview:true}')
+
+            RESPONSE=$(curl -fsS -X POST \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD")
 
             OK=$(echo "$RESPONSE" | jq -r '.ok')
             if [[ "$OK" == "true" ]]; then
@@ -79,5 +98,5 @@ jobs:
             fi
           else
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "ℹ️ Cuando identifiques el Chat ID correcto, guárdalo como secret `TELEGRAM_CHAT_ID` y vuelve a ejecutar este workflow." >> "$GITHUB_STEP_SUMMARY"
+            echo "ℹ️ Cuando identifiques el Chat ID correcto, guárdalo como secret \`TELEGRAM_CHAT_ID\` y vuelve a ejecutar este workflow." >> "$GITHUB_STEP_SUMMARY"
           fi
