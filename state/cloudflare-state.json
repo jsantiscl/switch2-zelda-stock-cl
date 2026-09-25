@@ -36,11 +36,11 @@
       "name": "Mathogames",
       "snapshot": {
         "http": 200,
-        "status": "available",
+        "status": "unavailable",
         "price_clp": 699990,
         "title": "PREVENTA DÍA 1 / Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary"
       },
-      "last_changed_at": "2026-09-25T20:11:57.000Z"
+      "last_changed_at": "2026-09-25T20:15:57.000Z"
     },
     "https://www.todojuegos.cl/Productos/NS2/Consola-Switch-2-Zelda-40th-Aniversario/": {
       "name": "TodoJuegos",
