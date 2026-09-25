@@ -762,6 +762,48 @@ async function createIssue(env, title, body) {
   }
 }
 
+function telegramPlainText(markdown) {
+  return markdown
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/^---$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function sendTelegram(env, title, body) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    console.warn("TELEGRAM SKIPPED · faltan TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID");
+    return { sent: false, reason: "not_configured" };
+  }
+
+  const text = [
+    "🚨 " + title,
+    "",
+    telegramPlainText(body),
+  ].join("\n").slice(0, 4000);
+
+  const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: env.TELEGRAM_CHAT_ID,
+      text,
+      disable_web_page_preview: false,
+    }),
+  });
+
+  if (!r.ok) {
+    const detail = await r.text();
+    console.error(`TELEGRAM ERROR · ${r.status} · ${detail}`);
+    return { sent: false, reason: `http_${r.status}` };
+  }
+
+  console.log("TELEGRAM OK · alerta enviada al grupo");
+  return { sent: true, reason: null };
+}
+
 async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = false) {
   if (!env.GITHUB_TOKEN) throw new Error("Missing GITHUB_TOKEN secret");
   const { sha, state } = await loadState(env);
@@ -917,21 +959,36 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
 
   if (dirty) await saveState(env, state, sha);
 
+  let telegramResult = { sent: false, reason: "no_alerts" };
+
   if (alerts.length) {
     const body = [
-      "# Switch 2 Zelda 40th — alerta Cloudflare",
+      "# Switch 2 Zelda 40th — alerta",
       "",
       ...alerts,
       "",
       "---",
       `Revisión: ${new Date(scheduledTime).toISOString()}`,
-      "El monitor Cloudflare se ejecuta cada 1 minuto.",
+      "Monitor automático: Cloudflare → GitHub Actions.",
     ].join("\n");
-    await createIssue(env, `🚨 Switch 2 Zelda 40th: ${alerts.length} novedad(es)`, body);
+
+    const title = `Switch 2 Zelda 40th: ${alerts.length} novedad(es)`;
+
+    await createIssue(env, `🚨 ${title}`, body);
+
+    // Telegram es un canal adicional: si falla, no invalida la alerta de GitHub.
+    try {
+      telegramResult = await sendTelegram(env, title, body);
+    } catch (err) {
+      telegramResult = { sent: false, reason: "exception" };
+      console.error("TELEGRAM EXCEPTION", err?.stack || String(err));
+    }
   }
 
   return {
     alerts: alerts.length,
+    telegram_sent: telegramResult.sent,
+    telegram_reason: telegramResult.reason,
     dirty,
     initialized: true,
     checked_stores: STORES.length,
