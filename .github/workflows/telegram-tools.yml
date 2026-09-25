@@ -1,0 +1,98 @@
+name: Telegram · configurar y probar
+
+run-name: 📲 Telegram · ${{ inputs.action }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Qué quieres hacer'
+        required: true
+        type: choice
+        options:
+          - descubrir_chat_id
+          - enviar_prueba
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar token
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "$BOT_TOKEN" ]; then
+            echo "::error::Falta el secret TELEGRAM_BOT_TOKEN en GitHub."
+            exit 1
+          fi
+
+      - name: Descubrir chat ID del grupo
+        if: inputs.action == 'descubrir_chat_id'
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl -fsS "https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?limit=100")"
+
+          if [ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ]; then
+            echo "::error::Telegram rechazó el token."
+            exit 1
+          fi
+
+          GROUPS="$(echo "$RESPONSE" | jq -r '
+            [
+              .result[]
+              | (.message // .edited_message // .channel_post // empty)
+              | .chat
+              | select(.type == "group" or .type == "supergroup")
+              | {id: .id, title: (.title // "sin nombre"), type: .type}
+            ]
+            | unique_by(.id)
+            | .[]
+            | "\(.id)\t\(.type)\t\(.title)"
+          ')"
+
+          if [ -z "$GROUPS" ]; then
+            echo "::error::No encontré ningún grupo. Agrega el bot al grupo y envía allí /test antes de volver a ejecutar."
+            exit 1
+          fi
+
+          {
+            echo "## 📲 Grupos detectados por el bot"
+            echo ""
+            echo "| Chat ID | Tipo | Grupo |"
+            echo "|---:|---|---|"
+            while IFS=$'\t' read -r ID TYPE TITLE; do
+              echo "| \`$ID\` | $TYPE | $TITLE |"
+            done <<< "$GROUPS"
+            echo ""
+            echo "Copia el **Chat ID** del grupo correcto y guárdalo como secret \`TELEGRAM_CHAT_ID\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "$GROUPS"
+
+      - name: Enviar mensaje de prueba
+        if: inputs.action == 'enviar_prueba'
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$CHAT_ID" ]; then
+            echo "::error::Falta el secret TELEGRAM_CHAT_ID."
+            exit 1
+          fi
+
+          PAYLOAD="$(jq -n --arg chat "$CHAT_ID" --arg text "✅ Prueba correcta: el monitor de la Nintendo Switch 2 Zelda 40th ya puede avisar a este grupo." '{chat_id:$chat,text:$text}')"
+
+          RESPONSE="$(curl -fsS             -H 'Content-Type: application/json'             -d "$PAYLOAD"             "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage")"
+
+          if [ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ]; then
+            echo "$RESPONSE" | jq
+            echo "::error::Telegram no pudo enviar el mensaje."
+            exit 1
+          fi
+
+          echo "### ✅ Mensaje de prueba enviado correctamente" >> "$GITHUB_STEP_SUMMARY"
