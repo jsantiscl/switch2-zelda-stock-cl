@@ -1,0 +1,83 @@
+name: Configurar y probar Telegram
+
+run-name: 📲 Telegram · configuración / prueba
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Validar bot y buscar chats recientes
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+            echo "::error::Falta el secret TELEGRAM_BOT_TOKEN"
+            exit 1
+          fi
+
+          echo "### Bot" >> "$GITHUB_STEP_SUMMARY"
+
+          ME=$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe")
+          BOT_USER=$(echo "$ME" | jq -r '.result.username // "desconocido"')
+          BOT_NAME=$(echo "$ME" | jq -r '.result.first_name // "Bot"')
+          echo "- ✅ Token válido: **@${BOT_USER}** (${BOT_NAME})" >> "$GITHUB_STEP_SUMMARY"
+
+          UPDATES=$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?limit=100")
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Chats recientes detectados" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          CHATS=$(echo "$UPDATES" | jq -r '
+            [.result[] |
+              (.message.chat // .edited_message.chat // .channel_post.chat // .my_chat_member.chat // empty)
+            ]
+            | unique_by(.id)
+            | .[]
+            | "| (.id) | (.type) | (.title // .username // .first_name // "sin nombre") |"
+          ')
+
+          if [[ -z "$CHATS" ]]; then
+            echo "No se detectaron chats todavía." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "En el grupo de Telegram envía un mensaje que mencione al bot, por ejemplo:" >> "$GITHUB_STEP_SUMMARY"
+            echo "`/start@${BOT_USER}`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Luego vuelve a ejecutar este workflow." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Chat ID | Tipo | Nombre |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---:|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            echo "$CHATS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Prueba de envío" >> "$GITHUB_STEP_SUMMARY"
+
+            RESPONSE=$(curl -fsS -X POST               "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"               -H "Content-Type: application/json"               -d "$(jq -nc                 --arg chat "${TELEGRAM_CHAT_ID}"                 --arg text "✅ Monitor Zelda configurado correctamente. Este grupo recibirá alertas de preventa/stock de la Nintendo Switch 2 edición Zelda 40th Anniversary."                 '{chat_id:$chat,text:$text,disable_web_page_preview:true}')"
+            )
+
+            OK=$(echo "$RESPONSE" | jq -r '.ok')
+            if [[ "$OK" == "true" ]]; then
+              echo "- ✅ Mensaje de prueba enviado correctamente." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- ❌ Telegram rechazó el mensaje." >> "$GITHUB_STEP_SUMMARY"
+              echo "$RESPONSE"
+              exit 1
+            fi
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "ℹ️ Cuando identifiques el Chat ID correcto, guárdalo como secret `TELEGRAM_CHAT_ID` y vuelve a ejecutar este workflow." >> "$GITHUB_STEP_SUMMARY"
+          fi
