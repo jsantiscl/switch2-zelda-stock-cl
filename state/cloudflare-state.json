@@ -51,8 +51,24 @@
         "title": "Consola Switch 2 Zelda 40th Aniversario [Consola Switch 2]"
       },
       "last_changed_at": "2026-09-21T23:53:55.000Z"
+    },
+    "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario": {
+      "name": "bestmart.cl",
+      "snapshot": {
+        "http": 200,
+        "status": "unavailable",
+        "price_clp": null,
+        "title": "Nintendo Switch 2 Zelda Edición 40 Aniversario – Bestmart"
+      },
+      "last_changed_at": "2026-09-29T17:00:47.000Z"
     }
   },
-  "discovered": {},
+  "discovered": {
+    "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario": {
+      "name": "bestmart.cl",
+      "url": "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario",
+      "found_at": "2026-09-29T17:00:47.000Z"
+    }
+  },
   "social_discovered": {}
 }
