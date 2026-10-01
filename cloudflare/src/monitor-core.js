@@ -950,6 +950,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   const { sha, state } = await loadState(env);
   state.stores ||= {};
   state.discovered ||= {};
+  state.retailer_discovered ||= {};
   state.pending_available ||= {};
   const initialized = Boolean(state.initialized);
   const alerts = [];
@@ -1074,7 +1075,85 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   const minute = new Date(scheduledTime).getUTCMinutes();
   const discoveryRan = forceDiscovery || minute % 15 === 0;
   const socialRan = forceDiscovery || minute % 5 === 0;
+  const retailerScanRan = forceDiscovery || minute % 2 === 0;
   let zonaGamerResult = "not_checked";
+  let retailerCatalogResult = "not_checked";
+
+  if (retailerScanRan) {
+    const catalog = await inspectRetailerCatalogs();
+    retailerCatalogResult = catalog.monitor_status;
+
+    for (const current of catalog.candidates) {
+      const old = state.stores[current.url]?.snapshot || null;
+      const snapshot = {
+        http: current.http,
+        status: current.status,
+        price_clp: current.price_clp,
+        title: current.title,
+      };
+
+      if (!state.retailer_discovered[current.url]) {
+        state.retailer_discovered[current.url] = {
+          name: current.name,
+          url: current.url,
+          retailer: current.retailer,
+          found_at: new Date(scheduledTime).toISOString(),
+        };
+        dirty = true;
+      }
+
+      const needsConfirmation =
+        current.status === "available" &&
+        (!old || old.status !== "available");
+
+      if (needsConfirmation) {
+        const pending = state.pending_available[current.url];
+        const signature = JSON.stringify({
+          status: current.status,
+          price_clp: current.price_clp,
+          title: current.title,
+        });
+        const count =
+          pending && pending.signature === signature
+            ? Number(pending.count || 0) + 1
+            : 1;
+
+        state.pending_available[current.url] = {
+          count,
+          signature,
+          first_seen_at: pending?.first_seen_at || new Date(scheduledTime).toISOString(),
+          last_seen_at: new Date(scheduledTime).toISOString(),
+        };
+        dirty = true;
+
+        if (count < 2) {
+          continue;
+        }
+
+        delete state.pending_available[current.url];
+        dirty = true;
+        alerts.push(describe(current, old, !old));
+      } else {
+        if (state.pending_available[current.url]) {
+          delete state.pending_available[current.url];
+          dirty = true;
+        }
+
+        if (initialized && old && actionableChange(old, current, false)) {
+          alerts.push(describe(current, old, false));
+        }
+      }
+
+      if (!old || !sameSnapshot(old, snapshot)) {
+        state.stores[current.url] = {
+          name: current.name,
+          snapshot,
+          last_changed_at: new Date(scheduledTime).toISOString(),
+        };
+        dirty = true;
+      }
+    }
+  }
 
   if (socialRan) {
     const zona = await inspectZonaGamerIquique(discoveryRan);
@@ -1194,6 +1273,8 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     reliable_stores: reliableStores,
     skipped_stores: skippedStores,
     mercado_libre: mercadoLibreResult,
+    retailer_catalogs: retailerCatalogResult,
+    retailer_scan_ran: retailerScanRan,
     zona_gamer: zonaGamerResult,
     social_ran: socialRan,
     discovery_ran: discoveryRan,
