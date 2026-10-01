@@ -28,6 +28,14 @@ const STORES = [
 const ML_STORE_URL = "https://www.mercadolibre.cl/tienda/nintendo";
 const ZONA_GAMER_FB_URL = "https://web.facebook.com/p/Zona-Gamer-Iquique-100063732433382/";
 const ZONA_GAMER_MIRROR_URL = "https://www.govern1.com/CL/Iquique/100213088361257/Zona-Gamer-Iquique";
+
+const RETAILER_WATCH_PAGES = [
+  { name: "Falabella", url: "https://www.falabella.com/falabella-cl/collection/nintendo-switch-2" },
+  { name: "Ripley", url: "https://simple.ripley.cl/tecno/nintendo/consolas?s=mdco&type=catalog" },
+  { name: "Lider", url: "https://www.lider.cl/browse/tecno/videojuegos/nintendo/66849718_80980590_97449970" },
+  { name: "Sniper", url: "https://sniper.cl/collections/todos-los-productos" },
+];
+
 const STATE_PATH = "state/cloudflare-state.json";
 
 const USER_AGENT =
