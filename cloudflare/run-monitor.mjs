@@ -36,6 +36,7 @@ console.log(
     `social: ${result.social_ran ? "sí" : "no"}`,
     `búsqueda amplia: ${result.discovery_ran ? "sí" : "no"}`,
     `nuevas: ${result.discovered_new}`,
+    `confirmaciones pendientes: ${result.pending_availability_confirmations || 0}`,
     `Telegram: ${result.telegram_sent ? "enviado" : result.telegram_reason}`,
   ].join(" · "),
 );
