@@ -47,17 +47,13 @@ const NEGATIVE = [
   "no tendrá preventa",
 ];
 
-const POSITIVE = [
+const PURCHASE_SIGNALS = [
   "agregar al carrito",
   "añadir al carrito",
   "anadir al carrito",
   "comprar ahora",
-  "en stock",
-  "disponible",
-  "preventa",
-  "pre-order",
-  "reservar",
   "reserva ahora",
+  "reservar ahora",
 ];
 
 const PREORDER_TERMS = [
@@ -195,13 +191,25 @@ function fallbackPrice(text) {
 
 function availabilityStatus(text, availability, http) {
   if (http === 404) return "page_missing";
+
+  // La disponibilidad estructurada del producto es más fiable que palabras
+  // sueltas del texto ("preventa", "disponible", etc.).
+  const av = String(availability || "").toLowerCase();
+  if (["outofstock", "soldout", "discontinued"].some((x) => av.includes(x))) {
+    return "unavailable";
+  }
+  if (["instock", "preorder", "presale", "limitedavailability"].some((x) => av.includes(x))) {
+    return "available";
+  }
+
   const low = normalize(text).toLowerCase();
   if (NEGATIVE.some((x) => low.includes(x))) return "unavailable";
 
-  const av = String(availability || "").toLowerCase();
-  if (["outofstock", "soldout", "discontinued"].some((x) => av.includes(x))) return "unavailable";
-  if (["instock", "preorder", "presale", "limitedavailability"].some((x) => av.includes(x))) return "available";
-  if (POSITIVE.some((x) => low.includes(x))) return "available";
+  // En el texto visible exigimos una acción real de compra/reserva. La mera
+  // palabra "PREVENTA" sirve para descubrir el producto, pero NO demuestra
+  // que la preventa esté abierta.
+  if (PURCHASE_SIGNALS.some((x) => low.includes(x))) return "available";
+
   return "unknown";
 }
 
@@ -234,7 +242,19 @@ async function inspectStore(store) {
     const host = new URL(store.url).hostname.toLowerCase();
 
     if (host.includes("todojuegos.cl") && visible.toLowerCase().includes("precio x confirmar")) price = null;
-    if (host.includes("santogames.cl") && price == null) status = "unavailable";
+
+    if (host.includes("santogames.cl")) {
+      // Santo Games mantiene "PREVENTA" permanentemente en la descripción.
+      // Si no hay disponibilidad estructurada positiva ni una acción real de
+      // compra/reserva, se considera cerrada/no disponible.
+      const av = String(jsonld.availability || "").toLowerCase();
+      const structuredAvailable = ["instock", "preorder", "presale", "limitedavailability"]
+        .some((x) => av.includes(x));
+      const purchaseAction = PURCHASE_SIGNALS.some((x) => visible.toLowerCase().includes(x));
+
+      if (!structuredAvailable && !purchaseAction) status = "unavailable";
+      if (price == null) status = "unavailable";
+    }
 
     return {
       ...store,
@@ -635,10 +655,21 @@ function statusLabel(status) {
 }
 
 function actionableChange(oldSnap, current, isNew = false) {
-  if (isNew) return true;
+  // Una URL nueva agotada/no concluyente se registra silenciosamente.
+  if (isNew) return current.status === "available";
   if (!oldSnap) return false;
+
   if (oldSnap.status !== "available" && current.status === "available") return true;
-  if (current.price_clp != null && oldSnap.price_clp !== current.price_clp) return true;
+
+  // Un cambio de precio solo es accionable cuando realmente se puede comprar.
+  if (
+    current.status === "available" &&
+    current.price_clp != null &&
+    oldSnap.price_clp !== current.price_clp
+  ) {
+    return true;
+  }
+
   return false;
 }
 
@@ -809,6 +840,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   const { sha, state } = await loadState(env);
   state.stores ||= {};
   state.discovered ||= {};
+  state.pending_available ||= {};
   const initialized = Boolean(state.initialized);
   const alerts = [];
   const checks = [];
@@ -828,6 +860,13 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
 
     if (["error", "unknown"].includes(current.status)) {
       skippedStores += 1;
+
+      // La confirmación debe ser consecutiva. Un error/unknown entre medio
+      // invalida el candidato de disponibilidad.
+      if (state.pending_available[current.url]) {
+        delete state.pending_available[current.url];
+        dirty = true;
+      }
       continue;
     }
 
@@ -841,7 +880,53 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
       title: current.title,
     };
 
-    if (initialized && old && actionableChange(old, current, false)) alerts.push(describe(current, old, false));
+    const isAvailabilityTransition =
+      initialized &&
+      old &&
+      old.status !== "available" &&
+      current.status === "available";
+
+    if (isAvailabilityTransition) {
+      const pending = state.pending_available[current.url];
+      const signature = JSON.stringify({
+        status: current.status,
+        price_clp: current.price_clp,
+        title: current.title,
+      });
+
+      const count =
+        pending && pending.signature === signature
+          ? Number(pending.count || 0) + 1
+          : 1;
+
+      state.pending_available[current.url] = {
+        count,
+        signature,
+        first_seen_at: pending?.first_seen_at || new Date(scheduledTime).toISOString(),
+        last_seen_at: new Date(scheduledTime).toISOString(),
+      };
+      dirty = true;
+
+      // No cambiamos el estado principal ni alertamos hasta tener dos
+      // lecturas fiables consecutivas (~1 minuto de confirmación).
+      if (count < 2) {
+        continue;
+      }
+
+      delete state.pending_available[current.url];
+      dirty = true;
+      alerts.push(describe(current, old, false));
+    } else {
+      if (state.pending_available[current.url]) {
+        delete state.pending_available[current.url];
+        dirty = true;
+      }
+
+      if (initialized && old && actionableChange(old, current, false)) {
+        alerts.push(describe(current, old, false));
+      }
+    }
+
     if (!old || !sameSnapshot(old, snapshot)) {
       state.stores[current.url] = {
         name: current.name,
@@ -918,7 +1003,9 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
         found_at: new Date(scheduledTime).toISOString(),
       };
 
-      if (initialized) alerts.push(describe(current, null, true));
+      if (initialized && actionableChange(null, current, true)) {
+        alerts.push(describe(current, null, true));
+      }
       discoveredNew += 1;
       dirty = true;
     }
@@ -945,7 +1032,9 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
         },
         last_changed_at: new Date(scheduledTime).toISOString(),
       };
-      if (initialized) alerts.push(describe(current, null, true));
+      if (initialized && actionableChange(null, current, true)) {
+        alerts.push(describe(current, null, true));
+      }
       discoveredNew += 1;
       dirty = true;
     }
@@ -999,6 +1088,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     social_ran: socialRan,
     discovery_ran: discoveryRan,
     discovered_new: discoveredNew,
+    pending_availability_confirmations: Object.keys(state.pending_available || {}).length,
     stores: checks,
   };
 }
