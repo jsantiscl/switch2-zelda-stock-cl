@@ -379,16 +379,16 @@ function catalogCandidateLinks(html, baseUrl) {
   const out = [];
   const seen = new Set();
 
-  for (const match of html.matchAll(/<a\\b([^>]*?)href=["\']([^"\']+)["\']([^>]*)>([\\s\\S]*?)<\\/a>/gi)) {
+  for (const match of html.matchAll(/<a\b([^>]*?)href=["\']([^"\']+)["\']([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const attrs = String(match[1] || "") + " " + String(match[3] || "");
     const href = decodeHref(match[2] || "").trim();
     const inner = match[4] || "";
     if (!href || href.startsWith("#") || href.startsWith("javascript:")) continue;
 
-    const altTexts = [...inner.matchAll(/\\b(?:alt|title)=["\']([^"\']+)["\']/gi)]
+    const altTexts = [...inner.matchAll(/\b(?:alt|title)=["\']([^"\']+)["\']/gi)]
       .map((m) => m[1])
       .join(" ");
-    const anchorTitle = attrs.match(/\\btitle=["\']([^"\']+)["\']/i)?.[1] || "";
+    const anchorTitle = attrs.match(/\btitle=["\']([^"\']+)["\']/i)?.[1] || "";
     const label = normalize(inner + " " + altTexts + " " + anchorTitle);
     if (!target40Nearby(label)) continue;
 
