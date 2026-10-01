@@ -113,3 +113,26 @@ El Worker también vigila la página pública de **Zona Gamer Iquique** como fue
 - búsqueda web específica durante las rondas amplias de cada 15 minutos.
 
 Solo genera alerta si el contenido contiene señales conjuntas de **Switch 2 + Zelda + 40.º aniversario**, evitando avisos por publicaciones generales de Nintendo, Zelda o consolas.
+
+
+## Catálogos chilenos adicionales
+
+Además de las fichas conocidas, el monitor revisa periódicamente catálogos de retailers que ya venden Nintendo Switch 2 en Chile:
+
+- Falabella
+- Ripley
+- Lider
+- Sniper
+
+Estos catálogos se escanean cada 2 minutos buscando una ficha específica de la consola Switch 2 Zelda 40th Anniversary. Si aparece una ficha nueva disponible, exige dos lecturas consecutivas antes de alertar.
+
+Cada 15 minutos la búsqueda ampliada agrega además consultas dirigidas a:
+
+- Paris
+- PC Factory
+- Falabella
+- Ripley
+- Lider
+- Sniper
+
+Una ficha nueva agotada se registra silenciosamente y no genera Telegram ni Issue.
