@@ -647,6 +647,12 @@ async function discoverNewStores(knownUrls) {
     '"Nintendo Switch 2" Zelda "40 años" Chile',
     '"The Legend of Zelda" "Switch 2" preventa Chile',
     '"Zelda 40th" "Switch 2" preventa',
+    'site:falabella.com/falabella-cl "Switch 2" Zelda "40" consola',
+    'site:simple.ripley.cl "Switch 2" Zelda "40" consola',
+    'site:paris.cl "Switch 2" Zelda "40" consola',
+    'site:lider.cl "Switch 2" Zelda "40" consola',
+    'site:pcfactory.cl "Switch 2" Zelda "40" consola',
+    'site:sniper.cl "Switch 2" Zelda "40" consola',
   ];
   const found = [];
   const seen = new Set(knownUrls);
