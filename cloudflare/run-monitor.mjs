@@ -32,6 +32,7 @@ console.log(
     `${result.skipped_stores} bloqueadas/no concluyentes`,
     `${result.alerts} alertas`,
     `Mercado Libre: ${result.mercado_libre}`,
+    `Catálogos Chile: ${result.retailer_catalogs || "not_checked"}`,
     `Zona Gamer: ${result.zona_gamer}`,
     `social: ${result.social_ran ? "sí" : "no"}`,
     `búsqueda amplia: ${result.discovery_ran ? "sí" : "no"}`,
