@@ -367,6 +367,102 @@ function targetExcerpt(text) {
   return target40Nearby(normalized) ? normalized.slice(0, 1400) : null;
 }
 
+
+function decodeHref(value = "") {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&#47;/gi, "/");
+}
+
+function catalogCandidateLinks(html, baseUrl) {
+  const out = [];
+  const seen = new Set();
+
+  for (const match of html.matchAll(/<a\\b([^>]*?)href=["\']([^"\']+)["\']([^>]*)>([\\s\\S]*?)<\\/a>/gi)) {
+    const attrs = String(match[1] || "") + " " + String(match[3] || "");
+    const href = decodeHref(match[2] || "").trim();
+    const inner = match[4] || "";
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) continue;
+
+    const altTexts = [...inner.matchAll(/\\b(?:alt|title)=["\']([^"\']+)["\']/gi)]
+      .map((m) => m[1])
+      .join(" ");
+    const anchorTitle = attrs.match(/\\btitle=["\']([^"\']+)["\']/i)?.[1] || "";
+    const label = normalize(inner + " " + altTexts + " " + anchorTitle);
+    if (!target40Nearby(label)) continue;
+
+    try {
+      const url = new URL(href, baseUrl);
+      if (!/^https?:$/.test(url.protocol)) continue;
+      url.hash = "";
+      const clean = url.toString();
+      if (seen.has(clean)) continue;
+      seen.add(clean);
+      out.push({ url: clean, label });
+    } catch (_) {}
+  }
+
+  return out;
+}
+
+async function inspectRetailerCatalogs() {
+  const candidates = [];
+  const statuses = [];
+
+  for (const retailer of RETAILER_WATCH_PAGES) {
+    try {
+      const r = await fetch(retailer.url, {
+        redirect: "follow",
+        headers: {
+          "user-agent": USER_AGENT,
+          "accept-language": "es-CL,es;q=0.9",
+          accept: "text/html,application/xhtml+xml",
+        },
+      });
+
+      if (!r.ok) {
+        statuses.push(retailer.name + ":http_" + r.status);
+        continue;
+      }
+
+      const html = await r.text();
+      const title = pageTitle(html) || "";
+      const first = (title + " " + normalize(html.slice(0, 30000))).toLowerCase();
+      if (CHALLENGE.some((x) => first.includes(x))) {
+        statuses.push(retailer.name + ":blocked");
+        continue;
+      }
+
+      const links = catalogCandidateLinks(html, retailer.url);
+      if (!links.length) {
+        statuses.push(retailer.name + ":not_found");
+        continue;
+      }
+
+      let accepted = 0;
+      for (const link of links.slice(0, 5)) {
+        const current = await inspectStore({
+          name: retailer.name + " · catálogo",
+          url: link.url,
+        });
+        if (["error", "unknown", "page_missing"].includes(current.status)) continue;
+        candidates.push({ ...current, source: "retailer_catalog", retailer: retailer.name });
+        accepted += 1;
+      }
+
+      statuses.push(retailer.name + ":" + (accepted ? "candidate_" + accepted : "candidate_unreadable"));
+    } catch (_) {
+      statuses.push(retailer.name + ":fetch_error");
+    }
+  }
+
+  return {
+    monitor_status: statuses.join("+") || "not_checked",
+    candidates,
+  };
+}
+
 function fingerprint(text) {
   let hash = 2166136261;
   const value = normalize(text).toLowerCase();
