@@ -211,6 +211,34 @@ function fallbackPrice(text) {
   return values.length ? Math.min(...values) : null;
 }
 
+function mathogamesCurrentProductPrices(text) {
+  const visible = normalize(text);
+
+  const productMatch = visible.match(
+    /consola\s+nintendo\s+switch\s*2.{0,180}the\s+legend\s+of\s+zelda.{0,120}40th\s+anniversary/i,
+  );
+
+  if (!productMatch || productMatch.index == null) {
+    return { transfer: null, card: null };
+  }
+
+  // Solo miramos el bloque inmediatamente posterior al título del producto
+  // para no capturar precios de productos relacionados o del catálogo.
+  const block = visible.slice(productMatch.index, productMatch.index + 1800);
+
+  const transferMatch = block.match(
+    /por\s+transferencia\s+bancaria\s*\$\s*([0-9]{1,3}(?:[.\s][0-9]{3})+|[0-9]{6,7})/i,
+  );
+  const cardMatch = block.match(
+    /con\s+tarjeta\s*\$\s*([0-9]{1,3}(?:[.\s][0-9]{3})+|[0-9]{6,7})/i,
+  );
+
+  return {
+    transfer: transferMatch ? money(transferMatch[1]) : null,
+    card: cardMatch ? money(cardMatch[1]) : null,
+  };
+}
+
 function availabilityStatus(text, availability, http) {
   if (http === 404) return "page_missing";
 
@@ -264,6 +292,14 @@ async function inspectStore(store) {
     const host = new URL(store.url).hostname.toLowerCase();
 
     if (host.includes("todojuegos.cl") && visible.toLowerCase().includes("precio x confirmar")) price = null;
+
+    if (host.includes("mathogames.cl")) {
+      const mathoPrices = mathogamesCurrentProductPrices(visible);
+      // Para Mathogames mostramos el valor por transferencia como precio base.
+      // Si no está disponible, usamos el valor con tarjeta.
+      if (mathoPrices.transfer != null) price = mathoPrices.transfer;
+      else if (mathoPrices.card != null) price = mathoPrices.card;
+    }
 
     if (host.includes("santogames.cl")) {
       // Santo Games mantiene "PREVENTA" permanentemente en la descripción.
