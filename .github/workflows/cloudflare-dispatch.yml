@@ -18,7 +18,8 @@ permissions:
   issues: write
 
 concurrency:
-  group: switch2-zelda-cloudflare-monitor
+  # Las validaciones por cambios de código no deben bloquear los ticks automáticos.
+  group: ${{ github.event_name == 'repository_dispatch' && 'switch2-zelda-scheduled' || 'switch2-zelda-manual' }}
   cancel-in-progress: false
 
 jobs:
