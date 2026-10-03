@@ -46,6 +46,16 @@ const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/126 Safari/537.36 Switch2ZeldaCloudflareMonitor/1.0";
 
+async function fetchExternal(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchExternal(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const NEGATIVE = [
   "agotado",
   "sin existencias",
@@ -227,7 +237,7 @@ function availabilityStatus(text, availability, http) {
 
 async function inspectStore(store) {
   try {
-    const response = await fetch(store.url, {
+    const response = await fetchExternal(store.url, {
       redirect: "follow",
       headers: {
         "user-agent": USER_AGENT,
@@ -307,7 +317,7 @@ function target40Nearby(text) {
 
 async function inspectMercadoLibreOfficial() {
   try {
-    const response = await fetch(ML_STORE_URL, {
+    const response = await fetchExternal(ML_STORE_URL, {
       headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" },
       redirect: "follow",
     });
@@ -416,7 +426,7 @@ async function inspectRetailerCatalogs() {
 
   for (const retailer of RETAILER_WATCH_PAGES) {
     try {
-      const r = await fetch(retailer.url, {
+      const r = await fetchExternal(retailer.url, {
         redirect: "follow",
         headers: {
           "user-agent": USER_AGENT,
@@ -483,7 +493,7 @@ async function inspectZonaGamerIquique(includeSearch = false) {
 
   // 1) Intento directo a la página pública de Facebook.
   try {
-    const r = await fetch(ZONA_GAMER_FB_URL, {
+    const r = await fetchExternal(ZONA_GAMER_FB_URL, {
       redirect: "follow",
       headers: {
         "user-agent": USER_AGENT,
@@ -531,7 +541,7 @@ async function inspectZonaGamerIquique(includeSearch = false) {
 
   // 2) Espejo público de publicaciones de Zona Gamer Iquique.
   try {
-    const r = await fetch(ZONA_GAMER_MIRROR_URL, {
+    const r = await fetchExternal(ZONA_GAMER_MIRROR_URL, {
       redirect: "follow",
       headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" },
     });
@@ -616,7 +626,7 @@ function xmlDecode(s = "") {
 async function bingRss(query) {
   const url = `https://www.bing.com/search?${new URLSearchParams({ q: query, format: "rss", cc: "cl", setlang: "es" })}`;
   try {
-    const r = await fetch(url, { headers: { "user-agent": USER_AGENT } });
+    const r = await fetchExternal(url, { headers: { "user-agent": USER_AGENT } });
     if (!r.ok) return [];
     const xml = await r.text();
     const out = [];
@@ -638,7 +648,7 @@ async function bingRss(query) {
 }
 
 async function discoverNewStores(knownUrls) {
-  const queries = [
+const queries = [
     '"Nintendo Switch 2" Zelda "40th Anniversary" Chile',
     '"Nintendo Switch 2" Zelda "40 aniversario" Chile',
     '"Switch 2" Zelda 40 preventa Chile',
@@ -658,36 +668,48 @@ async function discoverNewStores(knownUrls) {
     'site:pcfactory.cl "Switch 2" Zelda "40" consola',
     'site:sniper.cl "Switch 2" Zelda "40" consola',
   ];
-  const found = [];
   const seen = new Set(knownUrls);
+  const candidates = [];
 
-  for (const query of queries) {
-    for (const item of await bingRss(query)) {
-      let url;
-      try {
-        const u = new URL(item.url.split("#", 1)[0]);
-        if (!u.hostname.endsWith(".cl") && u.hostname !== "mercadolibre.cl" && !u.hostname.endsWith(".mercadolibre.cl")) continue;
-        if (u.hostname === "mercadolibre.cl" || u.hostname.endsWith(".mercadolibre.cl")) continue;
-        url = u.toString();
-      } catch (_) {
-        continue;
-      }
-      if (seen.has(url)) continue;
-      seen.add(url);
+  const batches = await Promise.all(queries.map((query) => bingRss(query)));
 
-      try {
-        const r = await fetch(url, { headers: { "user-agent": USER_AGENT, "accept-language": "es-CL,es;q=0.9" }, redirect: "follow" });
-        if (!r.ok) continue;
-        const html = await r.text();
-        if (!target40Nearby(`${item.title} ${html}`)) continue;
-        const current = await inspectStore({ name: new URL(url).hostname.replace(/^www\./, ""), url });
-        if (!["error", "unknown", "page_missing"].includes(current.status)) found.push({ ...current, source: "discovery" });
-      } catch (_) {}
+  for (const item of batches.flat()) {
+    let url;
+    try {
+      const u = new URL(item.url.split("#", 1)[0]);
+      if (!u.hostname.endsWith(".cl") && u.hostname !== "mercadolibre.cl" && !u.hostname.endsWith(".mercadolibre.cl")) continue;
+      if (u.hostname === "mercadolibre.cl" || u.hostname.endsWith(".mercadolibre.cl")) continue;
+      url = u.toString();
+    } catch (_) {
+      continue;
     }
-  }
-  return found;
-}
 
+    if (seen.has(url)) continue;
+    seen.add(url);
+    candidates.push({ item, url });
+    if (candidates.length >= 24) break;
+  }
+
+  const inspected = await Promise.all(
+    candidates.map(async ({ item, url }) => {
+      try {
+        const current = await inspectStore({
+          name: new URL(url).hostname.replace(/^www\./, ""),
+          url,
+        });
+
+        if (["error", "unknown", "page_missing"].includes(current.status)) return null;
+        const corpus = `${item.title || ""} ${current.title || ""}`;
+        if (!target40Nearby(corpus)) return null;
+        return { ...current, source: "discovery" };
+      } catch (_) {
+        return null;
+      }
+    }),
+  );
+
+  return inspected.filter(Boolean);
+}
 
 const SOCIAL_HOSTS = [
   "facebook.com",
@@ -707,7 +729,7 @@ function isSocialHost(hostname) {
 }
 
 async function discoverSocialPreorders() {
-  const queries = [
+const queries = [
     'site:facebook.com "Switch 2" Zelda preventa Chile',
     'site:facebook.com "Nintendo Switch 2" "edición Zelda" Chile',
     'site:facebook.com "Switch 2" Zelda "40 aniversario" Chile',
@@ -715,39 +737,37 @@ async function discoverSocialPreorders() {
     'site:instagram.com "Nintendo Switch 2" Zelda "40th" Chile',
     'site:instagram.com "edición Zelda" "Switch 2" preventa Chile',
   ];
-
   const found = [];
   const seen = new Set();
+  const batches = await Promise.all(queries.map((query) => bingRss(query)));
 
-  for (const query of queries) {
-    for (const item of await bingRss(query)) {
-      let host = "";
-      try {
-        host = new URL(item.url).hostname;
-      } catch (_) {
-        continue;
-      }
-      if (!isSocialHost(host)) continue;
-
-      const corpus = `${item.title || ""} ${item.description || ""}`;
-      if (!target40Nearby(corpus)) continue;
-      if (!hasPreorderSignal(corpus)) continue;
-
-      const key = `${item.url}|${normalize(corpus).toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const excerpt = targetExcerpt(corpus) || corpus;
-      found.push({
-        name: `Red social · ${host.replace(/^www\\./, "")}`,
-        url: item.url,
-        status: "available",
-        price_clp: fallbackPrice(excerpt),
-        title: item.title || "Posible preventa Switch 2 Zelda",
-        source: "social_search",
-        fingerprint: fingerprint(excerpt),
-      });
+  for (const item of batches.flat()) {
+    let host = "";
+    try {
+      host = new URL(item.url).hostname;
+    } catch (_) {
+      continue;
     }
+    if (!isSocialHost(host)) continue;
+
+    const corpus = `${item.title || ""} ${item.description || ""}`;
+    if (!target40Nearby(corpus)) continue;
+    if (!hasPreorderSignal(corpus)) continue;
+
+    const key = `${item.url}|${normalize(corpus).toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const excerpt = targetExcerpt(corpus) || corpus;
+    found.push({
+      name: `Red social · ${host.replace(/^www\\./, "")}`,
+      url: item.url,
+      status: "available",
+      price_clp: fallbackPrice(excerpt),
+      title: item.title || "Posible preventa Switch 2 Zelda",
+      source: "social_search",
+      fingerprint: fingerprint(excerpt),
+    });
   }
 
   return found;
@@ -964,10 +984,13 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   let skippedStores = 0;
   let discoveredNew = 0;
 
-  for (const store of STORES) {
-    const current = await inspectStore(store);
+  const knownResults = await Promise.all(
+    STORES.map((store) => inspectStore(store)),
+  );
+
+  for (const current of knownResults) {
     checks.push({
-      name: store.name,
+      name: current.name,
       status: current.status,
       price_clp: current.price_clp,
       http: current.http,
