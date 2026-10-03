@@ -3,12 +3,6 @@ name: Monitor Zelda disparado por Cloudflare
 run-name: 🤖 Cloudflare → GitHub · ${{ github.event.client_payload.scheduled_time || 'manual' }}
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/cloudflare-dispatch.yml'
-      - 'cloudflare/run-monitor.mjs'
-      - 'cloudflare/src/monitor-core.js'
   repository_dispatch:
     types: [cloudflare_tick]
   workflow_dispatch:
@@ -18,8 +12,7 @@ permissions:
   issues: write
 
 concurrency:
-  # Las validaciones por cambios de código no deben bloquear los ticks automáticos.
-  group: ${{ github.event_name == 'repository_dispatch' && 'switch2-zelda-scheduled' || 'switch2-zelda-manual' }}
+  group: switch2-zelda-monitor
   cancel-in-progress: false
 
 jobs:
