@@ -23,6 +23,10 @@ const STORES = [
     name: "WePlay",
     url: "https://www.weplay.cl/preventa-consola-switch-2-the-legend-of-zelda-40th-aniversario.html",
   },
+  {
+    name: "Paris",
+    url: "https://www.paris.cl/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-aniversario-609811999.html",
+  },
 ];
 
 const ML_STORE_URL = "https://www.mercadolibre.cl/tienda/nintendo";
