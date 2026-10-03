@@ -892,9 +892,49 @@ function githubHeaders(env) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function githubGetWithRetry(env, url, attempts = 3, timeoutMs = 12000) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        headers: githubHeaders(env),
+        signal: controller.signal,
+      });
+
+      if (response.ok || response.status === 404) {
+        return response;
+      }
+
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(`GitHub GET transient error: ${response.status}`);
+      } else {
+        return response;
+      }
+    } catch (err) {
+      lastError = err;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (attempt < attempts) {
+      await sleep(800 * attempt);
+    }
+  }
+
+  throw lastError || new Error("GitHub GET failed after retries");
+}
+
 async function loadState(env) {
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${STATE_PATH}`;
-  const r = await fetch(url, { headers: githubHeaders(env) });
+  const r = await githubGetWithRetry(env, url);
   if (r.status === 404) {
     return {
       sha: null,
