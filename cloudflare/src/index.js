@@ -10,8 +10,56 @@ function githubHeaders(env) {
   };
 }
 
+async function hasActiveMonitorRun(env) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const url =
+      `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/actions/runs?event=repository_dispatch&per_page=10`;
+
+    const response = await fetch(url, {
+      headers: githubHeaders(env),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn(`ACTIVE CHECK SKIPPED · GitHub ${response.status}`);
+      return false;
+    }
+
+    const payload = await response.json();
+    const activeStates = new Set(["queued", "in_progress", "pending", "waiting", "requested"]);
+    const active = (payload.workflow_runs || []).find((run) =>
+      activeStates.has(String(run.status || "").toLowerCase()),
+    );
+
+    if (active) {
+      console.log(
+        `DISPATCH SKIPPED · run #${active.run_number} sigue ${active.status} · no se crea otro tick`,
+      );
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    // Fail-open: si GitHub no permite comprobar el estado, intentamos
+    // despachar igualmente para no silenciar el monitor.
+    console.warn(
+      `ACTIVE CHECK ERROR · se despachará igual · ${err?.message || String(err)}`,
+    );
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function dispatchMonitor(env, scheduledTime, source = "cron") {
   if (!env.GITHUB_TOKEN) throw new Error("Missing GITHUB_TOKEN secret");
+
+  if (source === "cron" && await hasActiveMonitorRun(env)) {
+    return { dispatched: false, reason: "active_run" };
+  }
 
   const url =
     `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/dispatches`;
@@ -37,6 +85,7 @@ async function dispatchMonitor(env, scheduledTime, source = "cron") {
   console.log(
     `DISPATCH OK · ${new Date(scheduledTime).toISOString()} · GitHub monitor solicitado`,
   );
+  return { dispatched: true, reason: null };
 }
 
 export default {
