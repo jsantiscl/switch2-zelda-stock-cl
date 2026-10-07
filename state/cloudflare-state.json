@@ -61,6 +61,16 @@
         "title": "Nintendo Switch 2 Zelda Edición 40 Aniversario – Bestmart"
       },
       "last_changed_at": "2026-09-29T17:00:47.000Z"
+    },
+    "https://www.mathogames.cl/consolas-switch-2/2538-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html": {
+      "name": "mathogames.cl",
+      "snapshot": {
+        "http": 200,
+        "status": "unavailable",
+        "price_clp": 699990,
+        "title": "PREVENTA DÍA 1 / Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary"
+      },
+      "last_changed_at": "2026-10-07T05:00:32.000Z"
     }
   },
   "discovered": {
@@ -68,6 +78,11 @@
       "name": "bestmart.cl",
       "url": "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario",
       "found_at": "2026-09-29T17:00:47.000Z"
+    },
+    "https://www.mathogames.cl/consolas-switch-2/2538-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html": {
+      "name": "mathogames.cl",
+      "url": "https://www.mathogames.cl/consolas-switch-2/2538-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html",
+      "found_at": "2026-10-07T05:00:32.000Z"
     }
   },
   "social_discovered": {},
