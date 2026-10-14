@@ -85,78 +85,7 @@
       "found_at": "2026-10-07T05:00:32.000Z"
     }
   },
-  "social_discovered": {
-    "zona-gamer:388233bf": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://bestmart.cl/products/consola-nintendo-switch-2-the-legend-of-zelda-edicion-40-aniversario",
-      "source": "zona_gamer_search",
-      "fingerprint": "388233bf",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:b614a270": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario",
-      "source": "zona_gamer_search",
-      "fingerprint": "b614a270",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:f6641689": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.mercadolibre.cl/nintendo-switch-2-the-legend-of-zelda-40th-anniversary-edition/p/MLC79375219",
-      "source": "zona_gamer_search",
-      "fingerprint": "f6641689",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:6b02255f": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.todojuegos.cl/Productos/NS2/Consola-Switch-2-Zelda-40th-Aniversario/",
-      "source": "zona_gamer_search",
-      "fingerprint": "6b02255f",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:3577b24d": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.paris.cl/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-aniversario-609811999.html",
-      "source": "zona_gamer_search",
-      "fingerprint": "3577b24d",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:0defd8d3": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.mathogames.cl/consolas-switch-2/2538-preventa-dia-1-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html",
-      "source": "zona_gamer_search",
-      "fingerprint": "0defd8d3",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:78eba940": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.mercadolibre.cl/nintendo-switch-2-the-legend-of-zelda--40th-anniversary-edition/up/MLCU5175752827",
-      "source": "zona_gamer_search",
-      "fingerprint": "78eba940",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:b6269f5b": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://playservice.cl/producto/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary/",
-      "source": "zona_gamer_search",
-      "fingerprint": "b6269f5b",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:171f3dc7": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.latercera.com/tecnologia/noticia/nintendo-40-zelda-ocarina-of-time-switch-2/",
-      "source": "zona_gamer_search",
-      "fingerprint": "171f3dc7",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    },
-    "zona-gamer:fd445839": {
-      "name": "Zona Gamer Iquique · resultado indexado",
-      "url": "https://www.nintendo.com/es-es/Campanias-publicitarias/40-aniversario-de-The-Legend-of-Zelda/40-aniversario-de-The-Legend-of-Zelda-Productos-3186351.html",
-      "source": "zona_gamer_search",
-      "fingerprint": "fd445839",
-      "found_at": "2026-10-14T10:45:51.000Z"
-    }
-  },
+  "social_discovered": {},
   "retailer_discovered": {},
   "pending_available": {}
 }
