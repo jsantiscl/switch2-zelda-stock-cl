@@ -617,18 +617,38 @@ async function inspectZonaGamerIquique(includeSearch = false) {
 
     for (const query of queries) {
       for (const item of await bingRss(query)) {
+        let host = "";
+        try {
+          host = new URL(item.url).hostname.toLowerCase();
+        } catch (_) {
+          continue;
+        }
+
+        const isZonaMirror =
+          host === "govern1.com" ||
+          host.endsWith(".govern1.com");
+        const isAllowedSource = isSocialHost(host) || isZonaMirror;
+        if (!isAllowedSource) continue;
+
         const corpus = `${item.title || ""} ${item.description || ""}`;
-        const excerpt = targetExcerpt(corpus);
-        if (!excerpt) continue;
+        const normalizedCorpus = normalize(corpus).toLowerCase();
+
+        // Bing puede devolver resultados que coinciden con Zelda/40th pero que
+        // no pertenecen a Zona Gamer. Exigimos una mención explícita del local.
+        if (!normalizedCorpus.includes("zona gamer iquique")) continue;
+        if (!target40Nearby(corpus)) continue;
+        if (!hasPreorderSignal(corpus)) continue;
+
+        const excerpt = targetExcerpt(corpus) || corpus;
 
         candidates.push({
           name: "Zona Gamer Iquique · resultado indexado",
-          url: item.url || ZONA_GAMER_FB_URL,
+          url: item.url,
           status: "available",
           price_clp: fallbackPrice(excerpt),
           title: item.title || "Publicación Zona Gamer Iquique",
           source: "zona_gamer_search",
-          fingerprint: fingerprint(excerpt),
+          fingerprint: fingerprint(`${item.url}|${excerpt}`),
         });
       }
     }
