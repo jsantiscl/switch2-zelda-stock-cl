@@ -81,6 +81,16 @@
         "title": "Pro Controller Switch 2 + Stand Edicion Zelda 40th Aniversario [Accesorio Switch 2]"
       },
       "last_changed_at": "2026-10-18T05:30:11.000Z"
+    },
+    "https://kaiojuegos.cl/accesorios/2649-pro-controller-stand-the-legend-of-zelda-40th-aniversario-switch-2.html": {
+      "name": "kaiojuegos.cl",
+      "snapshot": {
+        "http": 200,
+        "status": "unavailable",
+        "price_clp": null,
+        "title": "Pro Controller + Stand: The Legend of Zelda 40th Aniversario - Switch 2"
+      },
+      "last_changed_at": "2026-10-24T08:00:34.000Z"
     }
   },
   "discovered": {
@@ -98,6 +108,11 @@
       "name": "todojuegos.cl",
       "url": "https://www.todojuegos.cl/Productos/NS2/Pro-Controller-Switch-2-Stand-Edicion-Zelda-40th-Aniversario/",
       "found_at": "2026-10-18T05:30:11.000Z"
+    },
+    "https://kaiojuegos.cl/accesorios/2649-pro-controller-stand-the-legend-of-zelda-40th-aniversario-switch-2.html": {
+      "name": "kaiojuegos.cl",
+      "url": "https://kaiojuegos.cl/accesorios/2649-pro-controller-stand-the-legend-of-zelda-40th-aniversario-switch-2.html",
+      "found_at": "2026-10-24T08:00:34.000Z"
     }
   },
   "social_discovered": {},
