@@ -46,11 +46,11 @@
       "name": "TodoJuegos",
       "snapshot": {
         "http": 200,
-        "status": "unavailable",
+        "status": "available",
         "price_clp": null,
         "title": "Consola Switch 2 Zelda 40th Aniversario [Consola Switch 2]"
       },
-      "last_changed_at": "2026-09-21T23:53:55.000Z"
+      "last_changed_at": "2026-10-28T16:01:58.000Z"
     },
     "https://bestmart.cl/collections/nintendo-switch-2-zelda-edicion-40-aniversario": {
       "name": "bestmart.cl",
@@ -132,12 +132,5 @@
   },
   "social_discovered": {},
   "retailer_discovered": {},
-  "pending_available": {
-    "https://www.todojuegos.cl/Productos/NS2/Consola-Switch-2-Zelda-40th-Aniversario/": {
-      "count": 1,
-      "signature": "{\"status\":\"available\",\"price_clp\":null,\"title\":\"Consola Switch 2 Zelda 40th Aniversario [Consola Switch 2]\"}",
-      "first_seen_at": "2026-10-28T16:00:58.000Z",
-      "last_seen_at": "2026-10-28T16:00:58.000Z"
-    }
-  }
+  "pending_available": {}
 }
