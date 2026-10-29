@@ -5,12 +5,12 @@
     "https://bestmart.cl/products/consola-nintendo-switch-2-the-legend-of-zelda-edicion-40-aniversario": {
       "name": "Bestmart",
       "snapshot": {
-        "http": 200,
-        "status": "unavailable",
-        "price_clp": 669990,
-        "title": "Preventa Consola Nintendo Switch 2 The Legend of Zelda Edición 40 Aniversario"
+        "http": 404,
+        "status": "page_missing",
+        "price_clp": null,
+        "title": null
       },
-      "last_changed_at": "2026-10-15T20:09:08.000Z"
+      "last_changed_at": "2026-10-29T12:35:01.000Z"
     },
     "https://www.santogames.cl/nintendo-switch-2-the-legend-of-zelda-40%C2%BA-aniversario": {
       "name": "Santo Games",
