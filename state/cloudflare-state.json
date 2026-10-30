@@ -101,6 +101,16 @@
         "title": "Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary Hong Kong Version"
       },
       "last_changed_at": "2026-10-27T21:15:34.000Z"
+    },
+    "https://www.paris.cl/preventa-consola-nintendo-switch-2-the-legend-of-zelda-40th-aniversario-609811999.html": {
+      "name": "Paris",
+      "snapshot": {
+        "http": 404,
+        "status": "page_missing",
+        "price_clp": null,
+        "title": null
+      },
+      "last_changed_at": "2026-10-30T22:04:22.000Z"
     }
   },
   "discovered": {
