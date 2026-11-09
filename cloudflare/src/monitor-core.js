@@ -1500,6 +1500,104 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     }
   }
 
+  if (zelda40CaseScanRan) {
+    const trackedCases = Object.values(state.zelda40_case_discovered || {});
+    const caseChecks = await discoverZelda40Cases(trackedCases);
+    let reliableCases = 0;
+
+    for (const current of caseChecks) {
+      const old = state.stores[current.url]?.snapshot || null;
+
+      if (["error", "unknown"].includes(current.status)) {
+        if (state.pending_available[current.url]) {
+          delete state.pending_available[current.url];
+          dirty = true;
+        }
+        continue;
+      }
+
+      reliableCases += 1;
+
+      if (!state.zelda40_case_discovered[current.url]) {
+        state.zelda40_case_discovered[current.url] = {
+          name: current.name,
+          url: current.url,
+          title: current.title,
+          source: current.source,
+          found_at: new Date(scheduledTime).toISOString(),
+        };
+        zelda40CaseNew += 1;
+        dirty = true;
+      } else if (
+        current.title &&
+        state.zelda40_case_discovered[current.url].title !== current.title
+      ) {
+        state.zelda40_case_discovered[current.url].title = current.title;
+        dirty = true;
+      }
+
+      const snapshot = {
+        http: current.http,
+        status: current.status,
+        price_clp: current.price_clp,
+        title: current.title,
+      };
+
+      const needsConfirmation =
+        current.status === "available" &&
+        (!old || old.status !== "available");
+
+      if (needsConfirmation) {
+        const pending = state.pending_available[current.url];
+        const signature = JSON.stringify({
+          status: current.status,
+          price_clp: current.price_clp,
+          title: current.title,
+        });
+        const count =
+          pending && pending.signature === signature
+            ? Number(pending.count || 0) + 1
+            : 1;
+
+        state.pending_available[current.url] = {
+          count,
+          signature,
+          first_seen_at: pending?.first_seen_at || new Date(scheduledTime).toISOString(),
+          last_seen_at: new Date(scheduledTime).toISOString(),
+        };
+        dirty = true;
+
+        // Dos lecturas fiables separadas por ~5 min reducen falsos positivos.
+        if (count < 2) continue;
+
+        delete state.pending_available[current.url];
+        dirty = true;
+        if (initialized) alerts.push(describe(current, old, !old));
+      } else {
+        if (state.pending_available[current.url]) {
+          delete state.pending_available[current.url];
+          dirty = true;
+        }
+        if (initialized && old && actionableChange(old, current, false)) {
+          alerts.push(describe(current, old, false));
+        }
+      }
+
+      if (!old || !sameSnapshot(old, snapshot)) {
+        state.stores[current.url] = {
+          name: current.name,
+          snapshot,
+          product_type: "zelda40_case",
+          last_changed_at: new Date(scheduledTime).toISOString(),
+        };
+        dirty = true;
+      }
+    }
+
+    zelda40CaseResult =
+      `checked_${caseChecks.length}_reliable_${reliableCases}`;
+  }
+
   if (socialRan) {
     const zona = await inspectZonaGamerIquique(discoveryRan);
     zonaGamerResult = zona.monitor_status;
