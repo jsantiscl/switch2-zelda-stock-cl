@@ -112,6 +112,29 @@ const EDITION_TERMS = [
   "edicion especial zelda",
 ];
 
+const ZELDA40_CASE_TERMS = [
+  "carrying case",
+  "travel case",
+  "estuche",
+  "funda",
+  "case",
+  "bolso",
+  "protector de pantalla",
+  "screen protector",
+];
+
+const ZELDA40_CASE_PURCHASE_SIGNALS = [
+  ...PURCHASE_SIGNALS,
+  "add to cart",
+  "pre-order now",
+  "preorder now",
+  "reserve now",
+  "buy now",
+  "añadir a la cesta",
+  "anadir a la cesta",
+  "agregar al carro",
+];
+
 const CHALLENGE = [
   "just a moment",
   "un momento",
@@ -142,7 +165,7 @@ function pageTitle(html = "") {
   return m ? normalize(m[1]) : null;
 }
 
-function money(value) {
+function money(value, min = 500000, max = 2000000) {
   if (value == null) return null;
   let s = String(value).replace(/CLP/gi, "").replace(/\$/g, "").replace(/\s/g, "").trim();
   if (/^\d{1,3}(?:\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
@@ -150,7 +173,7 @@ function money(value) {
   const digits = s.replace(/\D/g, "");
   if (!digits) return null;
   const n = Number(digits);
-  return n >= 500000 && n <= 2000000 ? n : null;
+  return n >= min && n <= max ? n : null;
 }
 
 function walk(value, cb) {
@@ -162,7 +185,7 @@ function walk(value, cb) {
   }
 }
 
-function parseJsonLd(html) {
+function parseJsonLd(html, minPrice = 500000, maxPrice = 2000000) {
   const scripts = [...html.matchAll(/<script[^>]+type=["'][^"']*ld\+json[^"']*["'][^>]*>([\s\S]*?)<\/script>/gi)];
   const candidates = [];
 
@@ -190,7 +213,7 @@ function parseJsonLd(html) {
   for (const offer of offers) {
     if (!offer || typeof offer !== "object") continue;
     const currency = String(offer.priceCurrency || "").toUpperCase();
-    const p = money(offer.price);
+    const p = money(offer.price, minPrice, maxPrice);
     if (p && (!currency || currency === "CLP")) prices.push(p);
     if (offer.availability) availability = String(offer.availability);
   }
@@ -349,6 +372,193 @@ function target40Nearby(text) {
   const looksLikeConsole = /consola|console|sistema|bundle|pack/i.test(low);
 
   return hasSwitch2 && hasZelda && hasEdition && hasPreorder && looksLikeConsole;
+}
+
+function targetZelda40Case(text) {
+  const low = normalize(text).toLowerCase();
+  const hasSwitch2 = /(?:nintendo\s*)?switch\s*2/i.test(low);
+  const hasZelda = /(?:the\s+legend\s+of\s+)?zelda/i.test(low);
+  const has40 =
+    /40(?:th|\.?º|°)?\s*(?:anniversary|aniversario|años)?/i.test(low) ||
+    /(?:anniversary|aniversario)\s*(?:edition\s*)?40/i.test(low);
+  const hasCase = ZELDA40_CASE_TERMS.some((term) => low.includes(term));
+  return hasSwitch2 && hasZelda && has40 && hasCase;
+}
+
+function targetZelda40CaseExcerpt(text) {
+  const normalized = normalize(text);
+  const lower = normalized.toLowerCase();
+  const anchors = [
+    "carrying case",
+    "estuche",
+    "funda",
+    "screen protector",
+    "protector de pantalla",
+    "40th",
+    "40 aniversario",
+    "zelda",
+  ];
+
+  for (const anchor of anchors) {
+    let index = lower.indexOf(anchor);
+    while (index >= 0) {
+      const start = Math.max(0, index - 700);
+      const end = Math.min(normalized.length, index + 1400);
+      const excerpt = normalized.slice(start, end);
+      if (targetZelda40Case(excerpt)) return excerpt;
+      index = lower.indexOf(anchor, index + anchor.length);
+    }
+  }
+
+  return targetZelda40Case(normalized) ? normalized.slice(0, 2200) : null;
+}
+
+function fallbackAccessoryPrice(text) {
+  const values = [];
+  for (const m of text.matchAll(/\$\s*([0-9]{1,3}(?:[.\s][0-9]{3})+|[0-9]{4,6})/g)) {
+    const n = money(m[1], 10000, 300000);
+    if (n) values.push(n);
+  }
+  return values.length ? Math.min(...values) : null;
+}
+
+function accessoryAvailabilityStatus(text, availability, http) {
+  if (http === 404) return "page_missing";
+
+  const av = String(availability || "").toLowerCase();
+  if (["outofstock", "soldout", "discontinued"].some((x) => av.includes(x))) {
+    return "unavailable";
+  }
+  if (["instock", "preorder", "presale", "limitedavailability"].some((x) => av.includes(x))) {
+    return "available";
+  }
+
+  const low = normalize(text).toLowerCase();
+  const negatives = [
+    ...NEGATIVE,
+    "currently unavailable",
+    "coming soon",
+    "disponible próximamente",
+    "disponible proximamente",
+    "sin disponibilidad",
+  ];
+  if (negatives.some((x) => low.includes(x))) return "unavailable";
+  if (ZELDA40_CASE_PURCHASE_SIGNALS.some((x) => low.includes(x))) return "available";
+  return "unknown";
+}
+
+async function inspectZelda40Case(candidate) {
+  try {
+    const response = await fetchExternal(candidate.url, {
+      redirect: "follow",
+      headers: {
+        "user-agent": USER_AGENT,
+        "accept-language": "es-CL,es;q=0.9,en;q=0.7",
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    const http = response.status;
+    if (http === 404) return { ...candidate, http, status: "page_missing", price_clp: null, title: candidate.title || null };
+    if ([403, 429].includes(http) || http >= 500) return { ...candidate, http, status: "error", price_clp: null, title: candidate.title || null };
+
+    const html = await response.text();
+    const title = pageTitle(html);
+    const first = `${title || ""} ${normalize(html.slice(0, 30000))}`.toLowerCase();
+    if (CHALLENGE.some((x) => first.includes(x))) {
+      return { ...candidate, http, status: "error", price_clp: null, title };
+    }
+
+    const visible = normalize(html);
+    const corpus = `${title || ""} ${visible}`;
+    if (!targetZelda40Case(corpus)) {
+      return { ...candidate, http, status: "unknown", price_clp: null, title };
+    }
+
+    const excerpt = targetZelda40CaseExcerpt(corpus) || corpus.slice(0, 2200);
+    const jsonld = parseJsonLd(html, 10000, 300000);
+    const status = accessoryAvailabilityStatus(excerpt, jsonld.availability, http);
+    const price = jsonld.price || fallbackAccessoryPrice(excerpt);
+
+    return {
+      ...candidate,
+      http,
+      status,
+      price_clp: price,
+      title: jsonld.name || title || candidate.title || "Estuche Zelda 40th Anniversary",
+      product_type: "zelda40_case",
+    };
+  } catch (_) {
+    return { ...candidate, http: null, status: "error", price_clp: null, title: candidate.title || null, product_type: "zelda40_case" };
+  }
+}
+
+async function discoverZelda40Cases(tracked = []) {
+  const queries = [
+    '"Nintendo Switch 2 Carrying Case and Screen Protector" "Zelda" "40th Anniversary"',
+    '"Nintendo Switch 2" Zelda "40th Anniversary" "carrying case" Chile',
+    '"Nintendo Switch 2" Zelda "40 aniversario" estuche Chile',
+    '"Nintendo Switch 2" Zelda "40th" funda Chile',
+    '"045496886318" Chile',
+    'site:mercadolibre.cl "Switch 2" Zelda "40th" estuche',
+    'site:paris.cl "Switch 2" Zelda "40" estuche',
+    'site:falabella.com/falabella-cl "Switch 2" Zelda "40" estuche',
+    'site:simple.ripley.cl "Switch 2" Zelda "40" estuche',
+    'site:lider.cl "Switch 2" Zelda "40" estuche',
+    'site:pcfactory.cl "Switch 2" Zelda "40" estuche',
+  ];
+
+  const byUrl = new Map();
+
+  for (const old of tracked) {
+    if (!old?.url) continue;
+    byUrl.set(old.url, {
+      name: old.name || "Estuche Zelda 40th · ficha conocida",
+      url: old.url,
+      title: old.title || null,
+      source: old.source || "zelda40_case_tracked",
+      tracked: true,
+      product_type: "zelda40_case",
+    });
+  }
+
+  const batches = await Promise.all(queries.map((query) => bingRss(query)));
+  for (const item of batches.flat()) {
+    let url;
+    let host;
+    try {
+      const u = new URL(item.url.split("#", 1)[0]);
+      host = u.hostname.toLowerCase();
+      const chileHost =
+        host.endsWith(".cl") ||
+        host === "mercadolibre.cl" ||
+        host.endsWith(".mercadolibre.cl");
+      if (!chileHost) continue;
+      u.hash = "";
+      url = u.toString();
+    } catch (_) {
+      continue;
+    }
+
+    const corpus = `${item.title || ""} ${item.description || ""}`;
+    if (!targetZelda40Case(corpus)) continue;
+
+    if (!byUrl.has(url)) {
+      byUrl.set(url, {
+        name: `Estuche Zelda 40th · ${host.replace(/^www\./, "")}`,
+        url,
+        title: item.title || null,
+        source: "zelda40_case_search",
+        tracked: false,
+        product_type: "zelda40_case",
+      });
+    }
+    if (byUrl.size >= 24) break;
+  }
+
+  return Promise.all(
+    [...byUrl.values()].map((candidate) => inspectZelda40Case(candidate)),
+  );
 }
 
 async function inspectMercadoLibreOfficial() {
@@ -874,17 +1084,25 @@ function sameSnapshot(a, b) {
 
 function describe(current, oldSnap = null, isNew = false) {
   let heading = `### 🔔 Cambio detectado: ${current.name}`;
-  if (isNew) heading = `### 🆕 Nueva publicación: ${current.name}`;
+  if (current.product_type === "zelda40_case" && current.status === "available") {
+    heading = `### 🧳 ESTUCHE ZELDA 40TH DISPONIBLE: ${current.name}`;
+  } else if (isNew) heading = `### 🆕 Nueva publicación: ${current.name}`;
   else if (oldSnap?.status !== "available" && current.status === "available") heading = `### 🚨 STOCK / PREVENTA DISPONIBLE: ${current.name}`;
   else if (oldSnap?.price_clp !== current.price_clp && current.price_clp != null) heading = `### 💰 Cambio de precio: ${current.name}`;
 
-  return [
+  const lines = [
     heading,
     "",
+  ];
+  if (current.product_type === "zelda40_case" && current.title) {
+    lines.push(`- Producto: ${current.title}`);
+  }
+  lines.push(
     `- Estado: ${oldSnap ? statusLabel(oldSnap.status) : "—"} → **${statusLabel(current.status)}**`,
     `- Precio: ${formatPrice(oldSnap?.price_clp)} → **${formatPrice(current.price_clp)}**`,
     `- Enlace: ${current.url}`,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 function utf8ToBase64(text) {
@@ -1071,6 +1289,7 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   state.stores ||= {};
   state.discovered ||= {};
   state.retailer_discovered ||= {};
+  state.zelda40_case_discovered ||= {};
   state.pending_available ||= {};
   const initialized = Boolean(state.initialized);
   const alerts = [];
@@ -1199,8 +1418,11 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
   const discoveryRan = forceDiscovery || minute % 15 === 0;
   const socialRan = forceDiscovery || minute % 5 === 0;
   const retailerScanRan = forceDiscovery || minute % 2 === 0;
+  const zelda40CaseScanRan = forceDiscovery || minute % 5 === 0;
   let zonaGamerResult = "not_checked";
   let retailerCatalogResult = "not_checked";
+  let zelda40CaseResult = "not_checked";
+  let zelda40CaseNew = 0;
 
   if (retailerScanRan) {
     const catalog = await inspectRetailerCatalogs();
@@ -1402,6 +1624,9 @@ async function runMonitor(env, scheduledTime = Date.now(), forceDiscovery = fals
     social_ran: socialRan,
     discovery_ran: discoveryRan,
     discovered_new: discoveredNew,
+    zelda40_case_scan_ran: zelda40CaseScanRan,
+    zelda40_cases: zelda40CaseResult,
+    zelda40_case_new: zelda40CaseNew,
     pending_availability_confirmations: Object.keys(state.pending_available || {}).length,
     stores: checks,
   };
