@@ -27,10 +27,10 @@
       "snapshot": {
         "http": 200,
         "status": "unavailable",
-        "price_clp": null,
+        "price_clp": 689990,
         "title": "Preventa Consola Nintendo Switch 2 – The Legend of Zelda 40th Anniversary &#8211; Play Service Talca &#8211; Videojuegos y consolas"
       },
-      "last_changed_at": "2026-11-11T14:08:20.447Z"
+      "last_changed_at": "2026-11-11T14:12:20.447Z"
     },
     "https://www.mathogames.cl/consolas-switch-2/2538-preventa-dia-1-consola-nintendo-switch-2-the-legend-of-zelda-40th-anniversary.html": {
       "name": "Mathogames",
@@ -157,13 +157,6 @@
   },
   "social_discovered": {},
   "retailer_discovered": {},
-  "pending_available": {
-    "https://www.santogames.cl/nintendo-switch-2-the-legend-of-zelda-40%C2%BA-aniversario": {
-      "count": 1,
-      "signature": "{\"status\":\"available\",\"price_clp\":699990,\"title\":\"Nintendo Switch 2 – The Legend of Zelda 40.º Aniversario\"}",
-      "first_seen_at": "2026-11-11T14:11:20.447Z",
-      "last_seen_at": "2026-11-11T14:11:20.447Z"
-    }
-  },
+  "pending_available": {},
   "zelda40_case_discovered": {}
 }
